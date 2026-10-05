@@ -1,0 +1,7 @@
+{
+  "name": "App Recibos - Controle de Pagamentos & Gerador de Recibos",
+  "description": "Sistema de gestão financeira de pagamentos e emissão automatizada de recibos de quitação em PDF, com acompanhamento de parcelas por beneficiário e quitação legal.",
+  "version": "1.0.0",
+  "permissions": [],
+  "capabilities": []
+}
