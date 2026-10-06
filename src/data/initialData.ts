@@ -3,8 +3,7 @@ import { Beneficiary, ContractConfig, PaymentRecord } from '../types';
 export const INITIAL_CONTRACT_CONFIG: ContractConfig = {
   pagadorNome: 'ABIGAIL PAULINO DA SILVA',
   pagadorCpf: '450.519.504-00',
-  tituloContrato:
-    'Contrato de Promessa de Cessão de Direitos Hereditários, firmado em 19 de agosto de 2025.',
+  tituloContrato: 'Contrato de Promessa de Cessão de Direitos Hereditários',
   dataContrato: '2025-08-19',
 };
 

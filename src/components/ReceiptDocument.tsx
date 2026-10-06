@@ -56,11 +56,17 @@ export const ReceiptDocument: React.FC<ReceiptDocumentProps> = ({
     fraseFormaPgto = 'Pagamento recebido em espécie (moeda corrente nacional).';
   }
 
+  // Sanitiza o título do contrato para garantir que ", firmado em..." nunca seja duplicado
+  const tituloContratoLimpo = (contract.tituloContrato || 'Contrato de Promessa de Cessão de Direitos Hereditários')
+    .replace(/,?\s*firmado\s+em.*$/i, '')
+    .replace(/\.$/, '')
+    .trim();
+
   const textoCompleto = `Recibo de Pagamento
 
 1ª VIA
 
-Eu, ${payment.nome}, inscrito(a) no CPF nº ${payment.cpf}, declaro que recebi de ${contract.pagadorNome}, CPF nº ${contract.pagadorCpf}, a quantia de R$ ${valorFormatado} (${valorExtenso}), no dia ${dataPtBr}, referente à parcela nº ${payment.parcela} do ${contract.tituloContrato}, firmado em 19 de agosto de 2025.
+Eu, ${payment.nome}, inscrito(a) no CPF nº ${payment.cpf}, declaro que recebi de ${contract.pagadorNome}, CPF nº ${contract.pagadorCpf}, a quantia de R$ ${valorFormatado} (${valorExtenso}), no dia ${dataPtBr}, referente à parcela nº ${payment.parcela} do ${tituloContratoLimpo}, firmado em 19 de agosto de 2025.
 
 ${fraseFormaPgto}
 
@@ -182,19 +188,23 @@ CPF: ${payment.cpf}`;
       */}
       <div
         id="receipt-print-area"
+        lang="pt-BR"
         className="w-full max-w-[210mm] min-h-[297mm] bg-white border border-slate-300 shadow-xl print:shadow-none print:border-none print:m-0 text-black select-text"
         style={{
-          fontFamily: '"Times New Roman", Times, serif',
+          fontFamily: '"Times New Roman", Times, Georgia, serif',
           paddingTop: '30mm',
           paddingLeft: '30mm',
           paddingRight: '20mm',
           paddingBottom: '20mm',
           boxSizing: 'border-box',
           lineHeight: '1.5',
+          textRendering: 'optimizeLegibility',
+          fontFeatureSettings: '"kern" 1, "liga" 1, "calt" 1',
+          WebkitFontSmoothing: 'antialiased',
         }}
       >
         {/* Recibo de Pagamento (fonte 14, negrito, centralizado) */}
-        <p className="text-center font-bold text-[14pt] leading-[1.5] m-0 p-0">
+        <p className="text-center font-bold text-[14pt] leading-[1.5] m-0 p-0 tracking-tight">
           Recibo de Pagamento
         </p>
 
@@ -209,16 +219,36 @@ CPF: ${payment.cpf}`;
         {/* 2 enter */}
         <div style={{ height: '3.0em' }}></div>
 
-        {/* Eu, ... (fonte 12, justificado, espaçamento 1,5) */}
-        <p className="text-justify text-[12pt] leading-[1.5] m-0 p-0">
-          Eu, <strong>{payment.nome}</strong>, inscrito(a) no CPF nº <strong>{payment.cpf}</strong>, declaro que recebi de <strong>{contract.pagadorNome}</strong>, CPF nº <strong>{contract.pagadorCpf}</strong>, a quantia de <strong>R$ {valorFormatado} ({valorExtenso})</strong>, no dia <strong>{dataPtBr}</strong>, referente à <strong>parcela nº {payment.parcela} do {contract.tituloContrato}</strong>, firmado em <strong>19 de agosto de 2025</strong>.
+        {/* Eu, ... (fonte 12, justificado, espaçamento 1,5 com microtipografia LaTeX) */}
+        <p
+          className="text-justify text-[12pt] leading-[1.5] m-0 p-0"
+          style={{
+            textAlign: 'justify',
+            textJustify: 'inter-word',
+            hyphens: 'auto',
+            WebkitHyphens: 'auto',
+            letterSpacing: '-0.005em',
+            wordSpacing: '0.015em',
+          }}
+        >
+          Eu, <strong>{payment.nome}</strong>, inscrito(a) no CPF&nbsp;nº&nbsp;<strong>{payment.cpf}</strong>, declaro que recebi de <strong>{contract.pagadorNome}</strong>, CPF&nbsp;nº&nbsp;<strong>{contract.pagadorCpf}</strong>, a quantia de&nbsp;<strong>R$&nbsp;{valorFormatado} ({valorExtenso})</strong>, no dia&nbsp;<strong>{dataPtBr}</strong>, referente à&nbsp;<strong>parcela&nbsp;nº&nbsp;{payment.parcela} do&nbsp;{tituloContratoLimpo}</strong>, firmado em&nbsp;<strong>19&nbsp;de&nbsp;agosto&nbsp;de&nbsp;2025</strong>.
         </p>
 
         {/* 1 enter */}
         <div style={{ height: '1.5em' }}></div>
 
-        {/* Pagamento recebido... (fonte 12, justificado, espaçamento 1,5) */}
-        <p className="text-justify text-[12pt] leading-[1.5] m-0 p-0">
+        {/* Pagamento recebido... (fonte 12, justificado, espaçamento 1,5 com microtipografia LaTeX) */}
+        <p
+          className="text-justify text-[12pt] leading-[1.5] m-0 p-0"
+          style={{
+            textAlign: 'justify',
+            textJustify: 'inter-word',
+            hyphens: 'auto',
+            WebkitHyphens: 'auto',
+            letterSpacing: '-0.005em',
+            wordSpacing: '0.015em',
+          }}
+        >
           {isTed ? (
             <>
               Pagamento recebido através de <strong>transferência bancária (TED), {payment.banco} ({payment.chave})</strong>.
@@ -229,7 +259,7 @@ CPF: ${payment.cpf}`;
             </>
           ) : (
             <>
-              Pagamento recebido através da <strong>chave Pix nº {payment.chave}, {payment.banco}</strong>.
+              Pagamento recebido através da <strong>chave&nbsp;Pix&nbsp;nº&nbsp;{payment.chave}, {payment.banco}</strong>.
             </>
           )}
         </p>
@@ -237,16 +267,36 @@ CPF: ${payment.cpf}`;
         {/* 1 enter */}
         <div style={{ height: '1.5em' }}></div>
 
-        {/* Após ... (fonte 12, justificado, espaçamento 1,5) */}
-        <p className="text-justify text-[12pt] leading-[1.5] m-0 p-0">
-          Após este pagamento, o saldo devedor atualizado referente à minha parte é de <strong>R$ {saldoFormatado} ({saldoExtenso})</strong>.
+        {/* Após ... (fonte 12, justificado, espaçamento 1,5 com microtipografia LaTeX) */}
+        <p
+          className="text-justify text-[12pt] leading-[1.5] m-0 p-0"
+          style={{
+            textAlign: 'justify',
+            textJustify: 'inter-word',
+            hyphens: 'auto',
+            WebkitHyphens: 'auto',
+            letterSpacing: '-0.005em',
+            wordSpacing: '0.015em',
+          }}
+        >
+          Após este pagamento, o saldo devedor atualizado referente à minha parte é de&nbsp;<strong>R$&nbsp;{saldoFormatado} ({saldoExtenso})</strong>.
         </p>
 
         {/* 1 enter */}
         <div style={{ height: '1.5em' }}></div>
 
-        {/* Para maior ... (fonte 12, justificado, espaçamento 1,5) */}
-        <p className="text-justify text-[12pt] leading-[1.5] m-0 p-0">
+        {/* Para maior ... (fonte 12, justificado, espaçamento 1,5 com microtipografia LaTeX) */}
+        <p
+          className="text-justify text-[12pt] leading-[1.5] m-0 p-0"
+          style={{
+            textAlign: 'justify',
+            textJustify: 'inter-word',
+            hyphens: 'auto',
+            WebkitHyphens: 'auto',
+            letterSpacing: '-0.005em',
+            wordSpacing: '0.015em',
+          }}
+        >
           Para maior clareza, firmo o presente recibo, que comprova o recebimento integral do valor mencionado, concedendo <strong>quitação plena, geral e irrevogável</strong> pela quantia recebida.
         </p>
 
@@ -255,7 +305,7 @@ CPF: ${payment.cpf}`;
 
         {/* Local, data ... (fonte 12, negrito, alinhado à direita) */}
         <p className="text-right font-bold text-[12pt] leading-[1.5] m-0 p-0">
-          {payment.cidadeUf}, {payment.dia} de {payment.mes} de {payment.ano}
+          {payment.cidadeUf}, {payment.dia}&nbsp;de&nbsp;{payment.mes}&nbsp;de&nbsp;{payment.ano}
         </p>
 
         {/* 7 enter */}

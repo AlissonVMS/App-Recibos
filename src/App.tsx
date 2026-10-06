@@ -56,7 +56,21 @@ export function App() {
   // Persistence via localStorage (v5 for Parcela 13 and scheduled parcels 14-18)
   const [contract, setContract] = useState<ContractConfig>(() => {
     const saved = localStorage.getItem('app_recibos_contract_v5');
-    return saved ? JSON.parse(saved) : INITIAL_CONTRACT_CONFIG;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.tituloContrato) {
+          parsed.tituloContrato = parsed.tituloContrato
+            .replace(/,?\s*firmado\s+em.*$/i, '')
+            .replace(/\.$/, '')
+            .trim();
+        }
+        return parsed;
+      } catch {
+        // fallback
+      }
+    }
+    return INITIAL_CONTRACT_CONFIG;
   });
 
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>(() => {
