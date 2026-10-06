@@ -399,8 +399,8 @@ export const BACEN_PF_BANKS: BacenBank[] = [
   },
   {
     "codigo": "260",
-    "nome": "Nu Pagamentos S.A. (Nubank)",
-    "label": "260 - Nu Pagamentos S.A. (Nubank)"
+    "nome": "Nu Pagamentos S.A.",
+    "label": "260 - Nu Pagamentos S.A."
   },
   {
     "codigo": "265",
@@ -1644,12 +1644,22 @@ export function extrairCodigoCompe(texto?: string): string {
  */
 export function extrairNomePuroBanco(bancoNomeOuCodigo?: string): string {
   if (!bancoNomeOuCodigo || !bancoNomeOuCodigo.trim()) return '';
-  const trimmed = bancoNomeOuCodigo.trim();
-  if (/^\d{3}\s*-\s*/.test(trimmed)) {
-    return trimmed.replace(/^\d{3}\s*-\s*/, '').trim();
+  let str = bancoNomeOuCodigo.trim();
+
+  // Remove código COMPE no início se presente (ex: "260 - Nu Pagamentos S.A.")
+  str = str.replace(/^\d{3}\s*-\s*/, '').trim();
+
+  // Remove qualquer sufixo "(Nubank)" que possa existir em dados legados/armazenados
+  str = str.replace(/\s*\(\s*nubank\s*\)/gi, '').trim();
+
+  // Se o que sobrou for apenas um código numérico de 1 a 3 dígitos (ex: "104" ou "260")
+  if (/^\d{1,3}$/.test(str)) {
+    const b = BACEN_PF_BANKS.find((x) => x.codigo === str.padStart(3, '0'));
+    if (b) return b.nome.replace(/\s*\(\s*nubank\s*\)/gi, '').trim();
   }
-  const formatado = formatarBancoCompe(trimmed);
-  return formatado.replace(/^\d{3}\s*-\s*/, '').trim();
+
+  const formatado = formatarBancoCompe(str);
+  return formatado.replace(/^\d{3}\s*-\s*/, '').replace(/\s*\(\s*nubank\s*\)/gi, '').trim();
 }
 
 /**
@@ -1672,7 +1682,7 @@ export function formatarBancoCompe(bancoNomeOuCodigo?: string): string {
   if (lower.includes('bradesco')) return '237 - Banco Bradesco S.A.';
   if (lower.includes('itaú') || lower.includes('itau')) return '341 - Itaú Unibanco S.A.';
   if (lower.includes('santander')) return '033 - Banco Santander (Brasil) S.A.';
-  if (lower.includes('nu') || lower.includes('nubank')) return '260 - Nu Pagamentos S.A. (Nubank)';
+  if (lower.includes('nu') || lower.includes('nubank')) return '260 - Nu Pagamentos S.A.';
   if (lower.includes('inter')) return '077 - Banco Inter S.A.';
   if (lower.includes('c6')) return '336 - Banco C6 S.A.';
   if (lower.includes('picpay')) return '380 - PicPay Instituição de Pagamento S.A.';
