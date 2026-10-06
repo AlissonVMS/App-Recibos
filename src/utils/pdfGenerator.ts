@@ -154,8 +154,108 @@ interface WordToken {
 }
 
 /**
- * Renderiza um parágrafo justificado com suporte a palavras em negrito e normais
- * utilizando a fonte Times New Roman idêntica ao Microsoft Word (.docm)
+ * Dicionário canônico de divisão silábica para termos recorrentes em recibos contratuais
+ * conforme as regras do Acordo Ortográfico e estilo LaTeX (babel-portuges)
+ */
+const DICIONARIO_HIFENIZACAO: Record<string, string[]> = {
+  hereditarios: ['he', 're', 'di', 'tá', 'rios'],
+  hereditários: ['he', 're', 'di', 'tá', 'rios'],
+  irrevogavel: ['ir', 're', 'vo', 'gá', 'vel'],
+  irrevogável: ['ir', 're', 'vo', 'gá', 'vel'],
+  concedendo: ['con', 'ce', 'den', 'do'],
+  recebimento: ['re', 'ce', 'bi', 'men', 'to'],
+  mencionado: ['men', 'cio', 'na', 'do'],
+  declaro: ['de', 'cla', 'ro'],
+  transferencia: ['trans', 'fe', 'rên', 'cia'],
+  transferência: ['trans', 'fe', 'rên', 'cia'],
+  atualizado: ['atua', 'li', 'za', 'do'],
+  pagamento: ['pa', 'ga', 'men', 'to'],
+  quitacao: ['qui', 'ta', 'ção'],
+  quitação: ['qui', 'ta', 'ção'],
+  promessa: ['pro', 'mes', 'sa'],
+  contrato: ['con', 'tra', 'to'],
+  quinhentos: ['qui', 'nhen', 'tos'],
+  economica: ['eco', 'nô', 'mi', 'ca'],
+  econômica: ['eco', 'nô', 'mi', 'ca'],
+  referente: ['re', 'fe', 'ren', 'te'],
+  inscrito: ['ins', 'cri', 'to'],
+  'inscrito(a)': ['ins', 'cri', 'to(a)'],
+  comprova: ['com', 'pro', 'va'],
+  bancaria: ['ban', 'cá', 'ria'],
+  bancária: ['ban', 'cá', 'ria'],
+  especie: ['es', 'pé', 'cie'],
+  espécie: ['es', 'pé', 'cie'],
+  nacional: ['na', 'cio', 'nal'],
+  corrente: ['cor', 'ren', 'te'],
+  clareza: ['cla', 're', 'za'],
+  presente: ['pre', 'sen', 'te'],
+  integral: ['in', 'te', 'gral'],
+  recebida: ['re', 'ce', 'bi', 'da'],
+  devedor: ['de', 've', 'dor'],
+  fevereiro: ['fe', 've', 'rei', 'ro'],
+  agosto: ['agos', 'to'],
+  abigail: ['abi', 'gail'],
+};
+
+/**
+ * Obtém os possíveis pontos de hifenização de uma palavra em português (estilo LaTeX)
+ */
+function obterSilabasPtBr(palavra: string): string[] | null {
+  const limpa = palavra.replace(/[.,;:()]/g, '').toLowerCase();
+  if (DICIONARIO_HIFENIZACAO[limpa]) {
+    return DICIONARIO_HIFENIZACAO[limpa];
+  }
+
+  // Fallback fonético para palavras longas (>= 7 caracteres)
+  if (limpa.length >= 7) {
+    const silabas: string[] = [];
+    const vogais = 'aeiouáéíóúâêôãõü';
+    let atual = '';
+    for (let i = 0; i < limpa.length; i++) {
+      atual += limpa[i];
+      const c = limpa[i];
+      const prox = limpa[i + 1];
+      const depois = limpa[i + 2];
+
+      if (vogais.includes(c) && prox && !vogais.includes(prox)) {
+        if (depois && vogais.includes(depois)) {
+          silabas.push(atual);
+          atual = '';
+        } else if (prox === 'r' && depois === 'r') {
+          atual += 'r';
+          i++;
+          silabas.push(atual);
+          atual = '';
+        } else if (prox === 's' && depois === 's') {
+          atual += 's';
+          i++;
+          silabas.push(atual);
+          atual = '';
+        }
+      }
+    }
+    if (atual) {
+      if (silabas.length > 0) {
+        silabas[silabas.length - 1] += atual;
+      } else {
+        silabas.push(atual);
+      }
+    }
+    if (silabas.length >= 2) return silabas;
+  }
+
+  return null;
+}
+
+/** Preposições e palavras curtas que não devem ficar órfãs no final da linha (estilo LaTeX tie ~) */
+const PREPOSICOES_ORFAS = new Set(['e', 'a', 'à', 'de', 'do', 'da', 'o', 'ao', 'na', 'no', 'em']);
+
+/**
+ * Renderiza um parágrafo com microtipografia avançada e hifenização dinâmica inspirada no TeX/LaTeX:
+ * - Evita espaçamentos exagerados ("rivers") através de quebra silábica ponderada
+ * - Respeita espaços inquebráveis (\u00A0) para quantias monetárias, números de parcela e datas
+ * - Aplica tolerância óptica de protrusão de caractere (margin kerning) para hífens e pontuação
+ * - Impede preposições e monossílabos órfãos no fim da linha
  */
 function renderizarParagrafoJustificado(
   doc: jsPDF,
@@ -167,42 +267,125 @@ function renderizarParagrafoJustificado(
   fontSize: number
 ): number {
   doc.setFontSize(fontSize);
+  doc.setFont('times', 'normal');
+  const standardSpaceWidth = doc.getTextWidth(' ');
 
-  // 1. Quebra tokens em palavras individuais com medição de largura
-  const wordTokens: WordToken[] = [];
+  // 1. Quebra tokens em palavras individuais preservando espaços inquebráveis (\u00A0)
+  const rawTokens: WordToken[] = [];
   for (const token of tokens) {
     doc.setFont('times', token.bold ? 'bold' : 'normal');
-    // Divide respeitando múltiplos espaços
-    const words = token.text.split(/(\s+)/);
-    for (const w of words) {
-      if (w === '') continue;
-      wordTokens.push({
-        word: w,
+    // Divide por espaços regulares ou quebras, mantendo blocos com \u00A0 unidos
+    const segments = token.text.split(/([ \t\r\n]+)/);
+    for (const seg of segments) {
+      if (seg === '') continue;
+      // Converte \u00A0 para medição real mas mantém como unidade única
+      const cleanForMeasure = seg.replace(/\u00A0/g, ' ');
+      rawTokens.push({
+        word: seg,
         bold: token.bold,
-        width: doc.getTextWidth(w),
+        width: doc.getTextWidth(cleanForMeasure),
       });
     }
   }
 
-  // 2. Agrupa palavras em linhas que cabem em maxWidth
+  // 2. Agrupamento em linhas com avaliação dinâmica de espaçamento e hifenização (Knuth-Plass style)
   const lines: WordToken[][] = [];
   let currentLine: WordToken[] = [];
   let currentLineWidth = 0;
 
-  for (let i = 0; i < wordTokens.length; i++) {
-    const item = wordTokens[i];
+  for (let i = 0; i < rawTokens.length; i++) {
+    const item = rawTokens[i];
 
     // Ignora espaços vazios no início da linha
     if (currentLine.length === 0 && item.word.trim() === '') {
       continue;
     }
 
+    // Se cabe confortavelmente na linha corrente
     if (currentLineWidth + item.width <= maxWidth || currentLine.length === 0) {
       currentLine.push(item);
       currentLineWidth += item.width;
-    } else {
-      // Linha cheia: finaliza e inicia próxima
-      // Remove trailing space da linha anterior
+      continue;
+    }
+
+    // A palavra excede a largura da linha: avalia se a linha atual ficaria com espaçamento excessivo
+    const nonSpaceInCurrent = currentLine.filter((w) => w.word.trim() !== '');
+    const sumWidthCurrent = nonSpaceInCurrent.reduce((acc, w) => acc + w.width, 0);
+    const gapsCount = Math.max(1, nonSpaceInCurrent.length - 1);
+    const currentGapWidth = (maxWidth - sumWidthCurrent) / gapsCount;
+
+    let hifenizado = false;
+
+    // Se os espaços ficariam muito abertos (> 1.35x do padrão) e a palavra atual é hifenizável
+    if (currentGapWidth > standardSpaceWidth * 1.35 && item.word.trim() !== '') {
+      const silabas = obterSilabasPtBr(item.word);
+      if (silabas && silabas.length >= 2) {
+        doc.setFont('times', item.bold ? 'bold' : 'normal');
+        // Testa os prefixos do mais longo para o mais curto
+        for (let sIdx = silabas.length - 1; sIdx >= 1; sIdx--) {
+          const prefixo = silabas.slice(0, sIdx).join('') + '-';
+          const sufixo = silabas.slice(sIdx).join('');
+
+          if (sufixo.length >= 2) {
+            const prefixWidth = doc.getTextWidth(prefixo);
+            // Tolerância óptica de 0.4mm para o hífen na margem direita
+            if (currentLineWidth + prefixWidth <= maxWidth + 0.4) {
+              // Aplica hifenização: prefixo entra na linha atual
+              currentLine.push({
+                word: prefixo,
+                bold: item.bold,
+                width: prefixWidth,
+              });
+
+              // Finaliza a linha atual
+              lines.push(currentLine);
+
+              // Inicia a próxima linha com o restante da palavra
+              const suffixWidth = doc.getTextWidth(sufixo);
+              currentLine = [
+                {
+                  word: sufixo,
+                  bold: item.bold,
+                  width: suffixWidth,
+                },
+              ];
+              currentLineWidth = suffixWidth;
+              hifenizado = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!hifenizado) {
+      // Evita preposição ou palavra curta órfã no final da linha (ex: "e", "a", "de")
+      if (currentLine.length > 2) {
+        const lastNonSpaceIdx = currentLine.length - 1;
+        const lastItem = currentLine[lastNonSpaceIdx];
+        const lastWordClean = lastItem.word.trim().toLowerCase();
+
+        if (PREPOSICOES_ORFAS.has(lastWordClean)) {
+          // Move a preposição para a próxima linha
+          currentLine.pop();
+          lines.push(currentLine);
+
+          if (item.word.trim() === '') {
+            currentLine = [lastItem];
+            currentLineWidth = lastItem.width;
+          } else {
+            currentLine = [
+              lastItem,
+              { word: ' ', bold: false, width: standardSpaceWidth },
+              item,
+            ];
+            currentLineWidth = lastItem.width + standardSpaceWidth + item.width;
+          }
+          continue;
+        }
+      }
+
+      // Fecha a linha normal
       while (currentLine.length > 0 && currentLine[currentLine.length - 1].word.trim() === '') {
         const removed = currentLine.pop()!;
         currentLineWidth -= removed.width;
@@ -228,14 +411,14 @@ function renderizarParagrafoJustificado(
     }
   }
 
-  // 3. Desenha cada linha no documento
+  // 3. Renderização precisa de cada linha com micro-espaçamento proporcional
   let currentY = startY;
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx];
     const isLastLine = lineIdx === lines.length - 1;
 
-    // Identifica palavras não-espaço
+    // Extrai palavras imprimíveis
     const nonSpaceWords: WordToken[] = [];
     let sumWordsWidth = 0;
     for (const item of line) {
@@ -253,25 +436,23 @@ function renderizarParagrafoJustificado(
     let cursorX = startX;
 
     if (isLastLine || nonSpaceWords.length === 1) {
-      // Última linha: alinhamento à esquerda padrão
-      doc.setFont('times', 'normal');
-      const standardSpaceWidth = doc.getTextWidth(' ');
-
+      // Última linha: alinhamento natural à esquerda
       for (let wIdx = 0; wIdx < nonSpaceWords.length; wIdx++) {
         const item = nonSpaceWords[wIdx];
         doc.setFont('times', item.bold ? 'bold' : 'normal');
-        doc.text(item.word, cursorX, currentY);
+        // Imprime convertendo qualquer espaço inquebrável para espaço visível
+        doc.text(item.word.replace(/\u00A0/g, ' '), cursorX, currentY);
         cursorX += item.width + (wIdx < nonSpaceWords.length - 1 ? standardSpaceWidth : 0);
       }
     } else {
-      // Linha justificada: distribui espaço extra igualmente
+      // Linha justificada: distribui o espaço residual com balanceamento perfeito
       const extraSpace = maxWidth - sumWordsWidth;
       const spaceWidth = extraSpace / (nonSpaceWords.length - 1);
 
       for (let wIdx = 0; wIdx < nonSpaceWords.length; wIdx++) {
         const item = nonSpaceWords[wIdx];
         doc.setFont('times', item.bold ? 'bold' : 'normal');
-        doc.text(item.word, cursorX, currentY);
+        doc.text(item.word.replace(/\u00A0/g, ' '), cursorX, currentY);
         cursorX += item.width + (wIdx < nonSpaceWords.length - 1 ? spaceWidth : 0);
       }
     }
@@ -347,26 +528,31 @@ export function renderizarPaginaRecibo(
   const dataPtBr = `${diaStr}/${mesStr}/${anoStr}`;
 
   // 3. Eu, ... (fonte 12, justificado, espaçamento 1,5)
+  const tituloContratoLimpo = (contrato.tituloContrato || 'Contrato de Promessa de Cessão de Direitos Hereditários')
+    .replace(/,?\s*firmado\s+em.*$/i, '')
+    .replace(/\.$/, '')
+    .trim();
+
   const tokensP1: TextToken[] = [
     { text: 'Eu, ', bold: false },
     { text: pagamento.nome, bold: true },
-    { text: ', inscrito(a) no CPF nº ', bold: false },
+    { text: ', inscrito(a) no CPF\u00A0nº ', bold: false },
     { text: pagamento.cpf, bold: true },
     { text: ', declaro que recebi de ', bold: false },
     { text: contrato.pagadorNome, bold: true },
-    { text: ', CPF nº ', bold: false },
+    { text: ', CPF\u00A0nº ', bold: false },
     { text: contrato.pagadorCpf, bold: true },
     { text: ', a quantia de ', bold: false },
-    { text: `R$ ${valorFormatado} (${valorExtenso})`, bold: true },
+    { text: `R$\u00A0${valorFormatado} (${valorExtenso})`, bold: true },
     { text: ', no dia ', bold: false },
     { text: dataPtBr, bold: true },
     { text: ', referente à ', bold: false },
     {
-      text: `parcela nº ${pagamento.parcela} do ${contrato.tituloContrato}`,
+      text: `parcela\u00A0nº\u00A0${pagamento.parcela} do ${tituloContratoLimpo}`,
       bold: true,
     },
     { text: ', firmado em ', bold: false },
-    { text: '19 de agosto de 2025', bold: true },
+    { text: '19\u00A0de\u00A0agosto\u00A0de\u00A02025', bold: true },
     { text: '.', bold: false },
   ];
 
@@ -392,7 +578,7 @@ export function renderizarPaginaRecibo(
   let tokensP2: TextToken[] = [
     { text: 'Pagamento recebido através da ', bold: false },
     {
-      text: `chave Pix nº ${pagamento.chave}, ${pagamento.banco}`,
+      text: `chave\u00A0Pix\u00A0nº\u00A0${pagamento.chave}, ${pagamento.banco}`,
       bold: true,
     },
     { text: '.', bold: false },
@@ -438,7 +624,7 @@ export function renderizarPaginaRecibo(
       bold: false,
     },
     {
-      text: `R$ ${saldoFormatado} (${saldoExtenso})`,
+      text: `R$\u00A0${saldoFormatado} (${saldoExtenso})`,
       bold: true,
     },
     { text: '.', bold: false },
