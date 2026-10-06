@@ -41,6 +41,7 @@ export interface PaymentRecord {
 export interface ContractConfig {
   pagadorNome: string;
   pagadorCpf: string;
+  pagadorBanco?: string; // ex: '104 - Caixa Econômica Federal'
   tituloContrato: string;
   dataContrato: string;
 }

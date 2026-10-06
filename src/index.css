@@ -6,31 +6,57 @@
     margin: 0;
   }
 
+  html,
   body {
     background-color: white !important;
     color: black !important;
     margin: 0 !important;
     padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    width: 100% !important;
+  }
+
+  /* Desativa regras que prendem a tela ou escondem rolagem na impressão */
+  .fixed,
+  .overflow-hidden,
+  .overflow-y-auto {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    background: white !important;
+    width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
   nav,
   header,
   footer,
+  aside,
   button,
+  kbd,
   .print\:hidden {
     display: none !important;
   }
 
   #receipt-print-area {
+    display: block !important;
     border: none !important;
     box-shadow: none !important;
     width: 210mm !important;
     min-height: 297mm !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding-top: 30mm !important;
     padding-left: 30mm !important;
     padding-right: 20mm !important;
     padding-bottom: 20mm !important;
     box-sizing: border-box !important;
+    page-break-after: avoid;
+    break-after: avoid;
   }
 }
