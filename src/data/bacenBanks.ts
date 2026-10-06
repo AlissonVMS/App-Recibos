@@ -1643,8 +1643,12 @@ export function extrairCodigoCompe(texto?: string): string {
  * Retorna apenas o nome por extenso do banco (sem o prefixo de código COMPE)
  */
 export function extrairNomePuroBanco(bancoNomeOuCodigo?: string): string {
-  if (!bancoNomeOuCodigo) return 'Caixa Econômica Federal';
-  const formatado = formatarBancoCompe(bancoNomeOuCodigo);
+  if (!bancoNomeOuCodigo || !bancoNomeOuCodigo.trim()) return '';
+  const trimmed = bancoNomeOuCodigo.trim();
+  if (/^\d{3}\s*-\s*/.test(trimmed)) {
+    return trimmed.replace(/^\d{3}\s*-\s*/, '').trim();
+  }
+  const formatado = formatarBancoCompe(trimmed);
   return formatado.replace(/^\d{3}\s*-\s*/, '').trim();
 }
 

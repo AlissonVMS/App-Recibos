@@ -6,7 +6,7 @@ import {
   valorPorExtenso,
 } from '../utils/numberToWordsPtBr';
 import { extrairDadosTransferencia } from '../utils/transferHelper';
-import { formatarBancoCompe } from '../data/bacenBanks';
+import { extrairNomePuroBanco } from '../data/bacenBanks';
 
 interface ReceiptDocumentProps {
   payment: PaymentRecord;
@@ -43,7 +43,7 @@ export const ReceiptDocument: React.FC<ReceiptDocumentProps> = ({
     payment.formaPgto?.toUpperCase().includes('ESPÉCIE') ||
     payment.formaPgto?.toUpperCase().includes('ESPECIE');
 
-  const bancoExibicao = formatarBancoCompe(payment.banco);
+  const bancoNomePuro = extrairNomePuroBanco(payment.banco);
 
   // Sanitiza o título do contrato para garantir que ", firmado em..." nunca seja duplicado
   const tituloContratoLimpo = (contract.tituloContrato || 'Contrato de Promessa de Cessão de Direitos Hereditários')
@@ -140,7 +140,7 @@ export const ReceiptDocument: React.FC<ReceiptDocumentProps> = ({
             </>
           ) : (
             <>
-              Pagamento recebido através da <strong>chave&nbsp;Pix&nbsp;nº&nbsp;{payment.chave}, {bancoExibicao}</strong>.
+              Pagamento recebido através da <strong>chave&nbsp;Pix&nbsp;nº&nbsp;{payment.chave}{bancoNomePuro ? `, ${bancoNomePuro}` : ''}</strong>.
             </>
           )}
         </p>
