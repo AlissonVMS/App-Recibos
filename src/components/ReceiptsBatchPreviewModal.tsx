@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ContractConfig, PaymentRecord } from '../types';
 import { ReceiptDocument } from './ReceiptDocument';
 import {
@@ -6,15 +6,15 @@ import {
   baixarPdfRecibosZip,
   gerarNomeArquivoLote,
   gerarNomeArquivoRecibo,
-  imprimirRecibosMultiplos,
 } from '../utils/pdfGenerator';
+import { imprimirLoteRecibos, imprimirElementoRecibo } from '../utils/printHelper';
 import { formatarMoeda, formatarDataPtBr } from '../utils/numberToWordsPtBr';
 import {
   X,
   Download,
   Printer,
   FileText,
-  AlertCircle,
+  Info,
   ChevronLeft,
   ChevronRight,
   Archive,
@@ -48,6 +48,18 @@ export const ReceiptsBatchPreviewModal: React.FC<ReceiptsBatchPreviewModalProps>
 
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+
+  // Tecla ESC fecha a conferência e volta ao registro de pagamentos
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Nome do arquivo gerado conforme regra padronizada inteligente
   const suggestedFileName = useMemo(() => {
@@ -95,7 +107,7 @@ export const ReceiptsBatchPreviewModal: React.FC<ReceiptsBatchPreviewModalProps>
 
   const handlePrintAll = () => {
     if (paidPayments.length === 0) return;
-    imprimirRecibosMultiplos(paidPayments, contract);
+    imprimirLoteRecibos(paidPayments, contract);
   };
 
   return (
@@ -106,10 +118,13 @@ export const ReceiptsBatchPreviewModal: React.FC<ReceiptsBatchPreviewModalProps>
           <button
             onClick={onClose}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors text-xs font-semibold"
-            title="Voltar ao Registro de Pagamentos"
+            title="Voltar ao Registro de Pagamentos (ou pressione ESC)"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="hidden sm:inline">Voltar</span>
+            <kbd className="hidden sm:inline-block ml-1 text-[10px] font-mono text-slate-500 bg-slate-100 border border-slate-300 rounded px-1.5 py-0.5">
+              ESC
+            </kbd>
           </button>
 
           <div className="h-5 w-px bg-slate-200 mx-1" />
@@ -162,27 +177,19 @@ export const ReceiptsBatchPreviewModal: React.FC<ReceiptsBatchPreviewModalProps>
                 : 'Nenhum Recibo'}
             </span>
           </button>
-
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition-colors ml-1"
-            title="Fechar Tela de Conferência"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
       </header>
 
-      {/* Faixa de Aviso Compacto se houver itens previstos na seleção */}
+      {/* Faixa de Aviso Informativo se houver itens previstos na seleção */}
       {plannedPayments.length > 0 && (
-        <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-2 text-amber-900 text-xs flex items-center justify-between gap-3 shrink-0">
+        <div className="bg-blue-50/80 border-b border-blue-200/90 px-4 sm:px-6 py-2.5 text-blue-900 text-xs flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <Info className="w-4 h-4 text-blue-600 shrink-0" />
             <span>
-              <strong>Atenção:</strong> Foram marcados {selectedPayments.length} itens no total, incluindo {plannedPayments.length} com status PREVISTO, apenas as {paidPayments.length} parcelas pagas estão sendo emitidas.
+              <strong>Aviso Informativo:</strong> Foram marcados {selectedPayments.length} itens no total, incluindo {plannedPayments.length} com status PREVISTO — apenas as {paidPayments.length} parcelas quitadas estão sendo emitidas.
             </span>
           </div>
-          <span className="text-[11px] font-mono font-bold text-amber-800 bg-amber-100 border border-amber-300/80 px-2 py-0.5 rounded-md shrink-0">
+          <span className="text-[11px] font-mono font-bold text-blue-800 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md shrink-0">
             {paidPayments.length} de {selectedPayments.length} emitidas
           </span>
         </div>
@@ -316,13 +323,13 @@ export const ReceiptsBatchPreviewModal: React.FC<ReceiptsBatchPreviewModalProps>
                 <ReceiptDocument
                   payment={currentPayment}
                   contract={contract}
-                  onPrint={() => window.print()}
+                  onPrint={() => imprimirElementoRecibo('receipt-print-area')}
                 />
               </div>
             </div>
           ) : (
             <div className="m-auto text-center p-8 bg-white rounded-2xl border border-slate-200 text-slate-500 text-sm max-w-md shadow-xs">
-              <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+              <Info className="w-8 h-8 text-blue-500 mx-auto mb-2" />
               <p className="font-bold text-slate-800">Nenhum recibo quitado para exibir</p>
               <p className="text-xs text-slate-500 mt-1">
                 Selecione parcelas com pagamento confirmado (status PAGO) para inspecionar e emitir os recibos correspondentes.

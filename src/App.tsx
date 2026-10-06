@@ -7,7 +7,6 @@ import {
 } from './data/initialData';
 import { formatarMoeda } from './utils/numberToWordsPtBr';
 import { ReceiptDocument } from './components/ReceiptDocument';
-import { BatchPdfModal } from './components/BatchPdfModal';
 import { PaymentModal } from './components/PaymentModal';
 import { BeneficiaryModal } from './components/BeneficiaryModal';
 import { ContractSettingsModal } from './components/ContractSettingsModal';
@@ -21,6 +20,7 @@ import {
   gerarNomeArquivoLote,
   gerarNomeArquivoRecibo,
 } from './utils/pdfGenerator';
+import { imprimirElementoRecibo } from './utils/printHelper';
 import {
   FileText,
   DollarSign,
@@ -50,6 +50,7 @@ import {
   AlertCircle,
   Archive,
   Printer,
+  Info,
 } from 'lucide-react';
 
 export function App() {
@@ -107,7 +108,6 @@ export function App() {
   const [filterStatus, setFilterStatus] = useState<'todos' | 'PAGO' | 'PREVISTO'>('todos');
 
   // Modals state
-  const [isBatchModalOpen, setIsBatchModalOpen] = useState<boolean>(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
   const [editingPayment, setEditingPayment] = useState<PaymentRecord | null>(null);
   const [isBeneficiaryModalOpen, setIsBeneficiaryModalOpen] = useState<boolean>(false);
@@ -143,6 +143,42 @@ export function App() {
   const [selectedTablePaymentIds, setSelectedTablePaymentIds] = useState<Set<string>>(new Set());
   const [viewingReceiptPayment, setViewingReceiptPayment] = useState<PaymentRecord | null>(null);
   const [isBatchPreviewModalOpen, setIsBatchPreviewModalOpen] = useState<boolean>(false);
+
+  // Estado para diálogo de confirmação com padrão sênior de UX/UI e Financeiro
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    subMessage?: string;
+    details?: { label: string; value: string }[];
+    confirmLabel: string;
+    confirmVariant: 'emerald' | 'amber' | 'red';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Confirmar',
+    confirmVariant: 'emerald',
+    onConfirm: () => {},
+  });
+
+  // Tecla ESC para fechar modal de confirmação ou visualização do recibo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (confirmDialog.isOpen) {
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+          return;
+        }
+        if (viewingReceiptPayment) {
+          setViewingReceiptPayment(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [confirmDialog.isOpen, viewingReceiptPayment]);
 
   // Filtra pagamentos filtrados que possuem status PAGO
   const filteredPaidPayments = filteredPayments.filter(
@@ -184,8 +220,8 @@ export function App() {
   const currentReceiptPayment =
     payments.find((p) => p.id === selectedReceiptPaymentId) || payments[0];
 
-  // Marcar parcela programada como PAGA
-  const handleMarkAsPaid = (paymentId: string) => {
+  // Executa: Marcar parcela como PAGA
+  const executeMarkAsPaid = (paymentId: string) => {
     const today = new Date();
     const dia = String(today.getDate()).padStart(2, '0');
     const MESES = [
@@ -230,6 +266,215 @@ export function App() {
     );
   };
 
+  // Solicita confirmação antes de marcar como pago (Sênior UX & Financeiro)
+  const handleMarkAsPaid = (paymentId: string) => {
+    const p = payments.find((x) => x.id === paymentId);
+    if (!p) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Confirmar Pagamento',
+      message: `Deseja registrar o pagamento da parcela nº ${p.parcela} de ${p.nome} no valor de ${formatarMoeda(p.valor)} como PAGA?`,
+      details: [
+        { label: 'Beneficiário (Cedente)', value: p.nome },
+        { label: 'Identificação', value: `Parcela nº ${p.parcela}` },
+        { label: 'Valor da Parcela', value: formatarMoeda(p.valor) },
+        { label: 'Novo Status', value: 'PAGO' },
+      ],
+      subMessage:
+        'A parcela será registrada como liquidada na data de hoje, amortizando o saldo devedor no controle financeiro e liberando a emissão do recibo oficial.',
+      confirmLabel: 'Confirmar Pagamento',
+      confirmVariant: 'emerald',
+      onConfirm: () => {
+        executeMarkAsPaid(paymentId);
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
+  };
+
+  // Executa: Reverter parcela para PREVISTO
+  const executeRevertToPrevisto = (paymentId: string) => {
+    const updatedPayments = payments.map((p) => {
+      if (p.id === paymentId) {
+        return {
+          ...p,
+          status: 'PREVISTO' as const,
+          dataPagamento: undefined,
+        };
+      }
+      return p;
+    });
+
+    setPayments(updatedPayments);
+
+    // Recalcula saldos dos cedentes
+    setBeneficiaries((prev) =>
+      prev.map((b) => {
+        const benPaid = updatedPayments
+          .filter((p) => p.nome === b.nome && (p.status || 'PAGO') === 'PAGO')
+          .reduce((acc, p) => acc + p.valor, 0);
+        const newSaldo = Math.max(0, b.contrato - benPaid);
+        return {
+          ...b,
+          pago: benPaid,
+          saldo: newSaldo,
+          status: newSaldo === 0 ? 'QUITADO' : 'EM ABERTO',
+        };
+      })
+    );
+  };
+
+  // Solicita confirmação antes de reverter para previsto (Sênior UX & Financeiro)
+  const handleRevertToPrevisto = (paymentId: string) => {
+    const p = payments.find((x) => x.id === paymentId);
+    if (!p) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Desfazer Quitação',
+      message: `Deseja desfazer a quitação e reverter a parcela nº ${p.parcela} de ${p.nome} para PREVISTO? O saldo devedor será recalculado.`,
+      details: [
+        { label: 'Beneficiário (Cedente)', value: p.nome },
+        { label: 'Identificação', value: `Parcela nº ${p.parcela}` },
+        { label: 'Valor da Parcela', value: formatarMoeda(p.valor) },
+        { label: 'Novo Status', value: 'PREVISTO' },
+      ],
+      subMessage:
+        'Atenção: A data de quitação será removida, o status retornará para PREVISTO e o saldo devedor do cedente será automaticamente restabelecido.',
+      confirmLabel: 'Desfazer Quitação',
+      confirmVariant: 'amber',
+      onConfirm: () => {
+        executeRevertToPrevisto(paymentId);
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
+  };
+
+  // Executa: Marcar selecionadas como pagas em lote
+  const executeBatchMarkAsPaid = () => {
+    if (selectedTablePaymentIds.size === 0) return;
+    const today = new Date();
+    const dia = String(today.getDate()).padStart(2, '0');
+    const MESES = [
+      'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+      'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+    ];
+    const mes = MESES[today.getMonth()];
+    const ano = String(today.getFullYear());
+    const dataFormatada = `${ano}-${String(today.getMonth() + 1).padStart(2, '0')}-${dia}`;
+
+    const updatedPayments = payments.map((p) => {
+      if (selectedTablePaymentIds.has(p.id)) {
+        return {
+          ...p,
+          status: 'PAGO' as const,
+          dataPagamento: p.dataPagamento || dataFormatada,
+          data: p.data || dataFormatada,
+          dia: p.dia || dia,
+          mes: p.mes || mes,
+          ano: p.ano || ano,
+        };
+      }
+      return p;
+    });
+
+    setPayments(updatedPayments);
+
+    // Recalcula saldos dos cedentes
+    setBeneficiaries((prev) =>
+      prev.map((b) => {
+        const benPaid = updatedPayments
+          .filter((p) => p.nome === b.nome && (p.status || 'PAGO') === 'PAGO')
+          .reduce((acc, p) => acc + p.valor, 0);
+        const newSaldo = Math.max(0, b.contrato - benPaid);
+        return {
+          ...b,
+          pago: benPaid,
+          saldo: newSaldo,
+          status: newSaldo === 0 ? 'QUITADO' : 'EM ABERTO',
+        };
+      })
+    );
+  };
+
+  // Solicita confirmação antes de marcar em lote (Sênior UX & Financeiro)
+  const handleBatchMarkAsPaid = () => {
+    if (selectedPrevistoTablePayments.length === 0) return;
+    const totalValor = selectedPrevistoTablePayments.reduce((acc, p) => acc + p.valor, 0);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Liquidação de Parcelas em Lote',
+      message: `Confirma a liquidação em lote de ${selectedPrevistoTablePayments.length} parcelas previstas selecionadas?`,
+      details: [
+        { label: 'Quantidade de Parcelas', value: `${selectedPrevistoTablePayments.length} parcela(s)` },
+        { label: 'Montante Total a Liquidar', value: formatarMoeda(totalValor) },
+      ],
+      subMessage:
+        'Todas as parcelas selecionadas serão registradas como quitadas na data de hoje, amortizando os saldos devedores dos respectivos cedentes.',
+      confirmLabel: `Liquidar ${selectedPrevistoTablePayments.length} Parcelas`,
+      confirmVariant: 'emerald',
+      onConfirm: () => {
+        executeBatchMarkAsPaid();
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
+  };
+
+  // Executa: Reverter selecionadas para previsto em lote
+  const executeBatchRevertToPrevisto = () => {
+    if (selectedTablePaymentIds.size === 0) return;
+
+    const updatedPayments = payments.map((p) => {
+      if (selectedTablePaymentIds.has(p.id)) {
+        return {
+          ...p,
+          status: 'PREVISTO' as const,
+          dataPagamento: undefined,
+        };
+      }
+      return p;
+    });
+
+    setPayments(updatedPayments);
+
+    // Recalcula saldos dos cedentes
+    setBeneficiaries((prev) =>
+      prev.map((b) => {
+        const benPaid = updatedPayments
+          .filter((p) => p.nome === b.nome && (p.status || 'PAGO') === 'PAGO')
+          .reduce((acc, p) => acc + p.valor, 0);
+        const newSaldo = Math.max(0, b.contrato - benPaid);
+        return {
+          ...b,
+          pago: benPaid,
+          saldo: newSaldo,
+          status: newSaldo === 0 ? 'QUITADO' : 'EM ABERTO',
+        };
+      })
+    );
+  };
+
+  // Solicita confirmação antes de reverter em lote (Sênior UX & Financeiro)
+  const handleBatchRevertToPrevisto = () => {
+    if (selectedPaidTablePayments.length === 0) return;
+    const totalValor = selectedPaidTablePayments.reduce((acc, p) => acc + p.valor, 0);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Reversão de Lote para Previsto',
+      message: `Deseja estornar a liquidação de ${selectedPaidTablePayments.length} parcelas pagas selecionadas?`,
+      details: [
+        { label: 'Quantidade de Parcelas', value: `${selectedPaidTablePayments.length} parcela(s)` },
+        { label: 'Montante Total a Reverter', value: formatarMoeda(totalValor) },
+      ],
+      subMessage:
+        'O status de todas as parcelas marcadas retornará para PREVISTO, e os saldos devedores serão recalculados e restabelecidos no controle contratual.',
+      confirmLabel: `Reverter ${selectedPaidTablePayments.length} Parcelas`,
+      confirmVariant: 'amber',
+      onConfirm: () => {
+        executeBatchRevertToPrevisto();
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
+  };
+
   // Handler: Save payment
   const handleSavePayment = (payment: PaymentRecord) => {
     let updatedPayments: PaymentRecord[];
@@ -266,14 +511,23 @@ export function App() {
     setSelectedReceiptPaymentId(payment.id);
   };
 
-  // Handler: Delete payment
-  const handleDeletePayment = (id: string) => {
-    if (!window.confirm('Deseja realmente excluir este registro de pagamento?')) return;
+  // Executa: Exclusão definitiva de parcela
+  const executeDeletePayment = (id: string) => {
     const target = payments.find((p) => p.id === id);
     if (!target) return;
 
     const remaining = payments.filter((p) => p.id !== id);
     setPayments(remaining);
+
+    // Remove da seleção se estiver marcado
+    setSelectedTablePaymentIds((prev) => {
+      if (prev.has(id)) {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      }
+      return prev;
+    });
 
     // Update beneficiary totals (considera apenas pagamentos com status PAGO)
     const benPaidPayments = remaining.filter(
@@ -295,6 +549,31 @@ export function App() {
         return b;
       })
     );
+  };
+
+  // Solicita confirmação antes de excluir parcela com padrão Sênior UX e Financeiro
+  const handleDeletePayment = (id: string) => {
+    const target = payments.find((p) => p.id === id);
+    if (!target) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Excluir Parcela',
+      message: `Deseja realmente excluir o lançamento da parcela nº ${target.parcela} de ${target.nome} no valor de ${formatarMoeda(target.valor)}?`,
+      details: [
+        { label: 'Beneficiário (Cedente)', value: target.nome },
+        { label: 'Identificação', value: `Parcela nº ${target.parcela}` },
+        { label: 'Valor da Parcela', value: formatarMoeda(target.valor) },
+        { label: 'Status Atual', value: target.status || 'PAGO' },
+      ],
+      subMessage:
+        'Atenção: Esta ação é definitiva e removerá permanentemente o registro financeiro. O saldo devedor do cedente será recalculado no controle contratual.',
+      confirmLabel: 'Sim, Excluir Parcela',
+      confirmVariant: 'red',
+      onConfirm: () => {
+        executeDeletePayment(id);
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
   };
 
   // Handler: Save Beneficiary (mantém contrato e valores financeiros protegidos)
@@ -480,22 +759,13 @@ export function App() {
               payments={payments}
             />
 
-            <div className="flex items-center justify-between pt-2 border-t border-slate-200">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  Beneficiários
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Acompanhamento individual de cotas, pagamentos, saldos e dados bancários para PIX
-                </p>
-              </div>
-              <button
-                onClick={() => setIsBatchModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Gerar PDFs em Lote
-              </button>
+            <div className="pt-2 border-t border-slate-200">
+              <h2 className="text-lg font-bold text-slate-900">
+                Beneficiários
+              </h2>
+              <p className="text-xs text-slate-500">
+                Acompanhamento individual de cotas, pagamentos, saldos e dados bancários para PIX
+              </p>
             </div>
 
             {/* Beneficiaries Cards Grid */}
@@ -778,69 +1048,121 @@ export function App() {
             </div>
 
             {/* Barra Conveniente de Seleção para Emissão de Recibos */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold text-slate-700">
-                  {selectedTablePayments.length > 0 ? (
-                    <>
-                      <strong className="text-blue-700 font-bold">{selectedTablePayments.length}</strong>{' '}
-                      parcela{selectedTablePayments.length > 1 ? 's' : ''} selecionada{selectedTablePayments.length > 1 ? 's' : ''} •{' '}
-                      <span className="text-emerald-700 font-bold">
-                        {selectedPaidTablePayments.length} paga{selectedPaidTablePayments.length > 1 ? 's' : ''} ({formatarMoeda(selectedPaidTablePayments.reduce((acc, p) => acc + p.valor, 0))})
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 px-4 flex flex-col gap-2.5 text-xs">
+              {/* Linha 1: Contagem e Botões em Linha Confortável */}
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                {/* Resumo com badges e whitespace-nowrap para nunca quebrar de forma desconfortável */}
+                <div className="flex items-center gap-2 whitespace-nowrap shrink-0">
+                  <span className="font-semibold text-slate-700 inline-flex items-center gap-1.5 flex-wrap">
+                    {selectedTablePayments.length > 0 ? (
+                      <>
+                        <span className="bg-blue-100 text-blue-900 font-bold px-2.5 py-0.5 rounded-md font-mono text-xs shadow-2xs">
+                          {selectedTablePayments.length} selecionada{selectedTablePayments.length > 1 ? 's' : ''}
+                        </span>
+                        <span className="text-slate-400 font-bold">•</span>
+                        <span className="bg-emerald-100 text-emerald-900 font-bold px-2.5 py-0.5 rounded-md font-mono text-xs shadow-2xs">
+                          {selectedPaidTablePayments.length} paga{selectedPaidTablePayments.length > 1 ? 's' : ''} ({formatarMoeda(selectedPaidTablePayments.reduce((acc, p) => acc + p.valor, 0))})
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-slate-500 font-normal">
+                        Nenhuma parcela marcada manualmente. Clique nas caixas de seleção da tabela para marcar em lote.
                       </span>
-                    </>
-                  ) : (
-                    <span className="text-slate-500">
-                      Nenhuma parcela marcada manualmente. Clique nas caixas de seleção da tabela para marcar em lote.
-                    </span>
-                  )}
-                </span>
-
-                {/* Aviso compacto quando itens PREVISTOS estão na seleção */}
-                {selectedPrevistoTablePayments.length > 0 && (
-                  <span className="bg-amber-50 text-amber-900 border border-amber-300/80 px-2.5 py-1 rounded-lg font-medium text-[11px] inline-flex items-center gap-1.5 shadow-2xs">
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span>
-                      <strong>Atenção:</strong> Foram marcados {selectedTablePayments.length} itens no total, incluindo {selectedPrevistoTablePayments.length} com status PREVISTO, apenas as {selectedPaidTablePayments.length} parcelas pagas estão sendo emitidas.
-                    </span>
+                    )}
                   </span>
-                )}
-              </div>
+                </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const allIds = filteredPayments.map((p) => p.id);
-                    setSelectedTablePaymentIds(new Set(allIds));
-                  }}
-                  className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-md border border-slate-300 transition-colors"
-                  title="Selecionar todos os itens exibidos (pagos e previstos)"
-                >
-                  Marcar Todos ({filteredPayments.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const allPaidIds = payments
-                      .filter((p) => (p.status || 'PAGO') === 'PAGO')
-                      .map((p) => p.id);
-                    setSelectedTablePaymentIds(new Set(allPaidIds));
-                  }}
-                  className="px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md border border-blue-200 transition-colors"
-                >
-                  Marcar Somente Pagos ({payments.filter((p) => (p.status || 'PAGO') === 'PAGO').length})
-                </button>
-                {selectedTablePaymentIds.size > 0 && (
+                {/* Botões de Ação Redimensionados para Visualização Confortável em Linha */}
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                  {/* Ações em lote para parcelas selecionadas */}
+                  {selectedTablePayments.length > 0 && (
+                    <>
+                      {selectedPrevistoTablePayments.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleBatchMarkAsPaid}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow-2xs transition-colors whitespace-nowrap"
+                          title="Marcar todas as parcelas previstas selecionadas como PAGAS"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Pagar ({selectedPrevistoTablePayments.length})</span>
+                        </button>
+                      )}
+
+                      {selectedPaidTablePayments.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleBatchRevertToPrevisto}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-md shadow-2xs transition-colors whitespace-nowrap"
+                          title="Desmarcar pagamentos e reverter parcelas selecionadas para PREVISTO"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Reverter ({selectedPaidTablePayments.length})</span>
+                        </button>
+                      )}
+
+                      {selectedPaidTablePayments.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleOpenReceiptsPreview}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-xs transition-colors whitespace-nowrap"
+                          title="Conferir previamente e emitir recibos das parcelas pagas selecionadas"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>Emitir ({selectedPaidTablePayments.length})</span>
+                        </button>
+                      )}
+
+                      <div className="h-4 w-px bg-slate-300 mx-0.5 hidden sm:block" />
+                    </>
+                  )}
+
                   <button
                     type="button"
-                    onClick={() => setSelectedTablePaymentIds(new Set())}
-                    className="px-2.5 py-1 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-100 rounded-md border border-slate-200 transition-colors"
+                    onClick={() => {
+                      const allIds = filteredPayments.map((p) => p.id);
+                      setSelectedTablePaymentIds(new Set(allIds));
+                    }}
+                    className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 rounded-md border border-slate-300 transition-colors whitespace-nowrap"
+                    title="Selecionar todos os itens exibidos (pagos e previstos)"
                   >
-                    Desmarcar Todos
+                    Todos ({filteredPayments.length})
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allPaidIds = payments
+                        .filter((p) => (p.status || 'PAGO') === 'PAGO')
+                        .map((p) => p.id);
+                      setSelectedTablePaymentIds(new Set(allPaidIds));
+                    }}
+                    className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md border border-blue-200 transition-colors whitespace-nowrap"
+                    title="Selecionar apenas as parcelas com status PAGO"
+                  >
+                    Somente Pagos ({payments.filter((p) => (p.status || 'PAGO') === 'PAGO').length})
+                  </button>
+                  {selectedTablePaymentIds.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTablePaymentIds(new Set())}
+                      className="px-2.5 py-1 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 rounded-md border border-slate-200 transition-colors whitespace-nowrap"
+                      title="Desmarcar todas as parcelas selecionadas"
+                    >
+                      Desmarcar
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* Linha 2 (Abaixo dos botões, nunca os desloca): Aviso Informativo */}
+              {selectedPrevistoTablePayments.length > 0 && (
+                <div className="w-full bg-blue-50/80 text-blue-900 border border-blue-200/90 px-3 py-2 rounded-lg font-medium text-[11px] flex items-center gap-2 shadow-2xs border-t border-slate-200/50 mt-0.5">
+                  <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>
+                    <strong>Aviso Informativo:</strong> Foram marcados {selectedTablePayments.length} itens no total, incluindo {selectedPrevistoTablePayments.length} com status PREVISTO — apenas as {selectedPaidTablePayments.length} parcelas quitadas estão sendo emitidas.
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Table */}
@@ -965,15 +1287,33 @@ export function App() {
                             </td>
                             <td className="py-2.5 px-2 text-center whitespace-nowrap">
                               {isPrevisto ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200/80 rounded-full font-bold text-[10px] tracking-tight">
-                                  <Clock className="w-2.5 h-2.5" />
-                                  PREVISTO
-                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMarkAsPaid(p.id);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 hover:bg-emerald-50 text-amber-700 hover:text-emerald-700 border border-amber-200/80 hover:border-emerald-300 rounded-full font-bold text-[10px] tracking-tight transition-all cursor-pointer group shadow-2xs"
+                                  title="Clique para marcar como PAGO"
+                                >
+                                  <Clock className="w-2.5 h-2.5 group-hover:hidden" />
+                                  <CheckCircle2 className="w-2.5 h-2.5 hidden group-hover:inline text-emerald-600" />
+                                  <span>PREVISTO</span>
+                                </button>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/80 rounded-full font-bold text-[10px] tracking-tight">
-                                  <CheckCircle2 className="w-2.5 h-2.5" />
-                                  PAGO
-                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRevertToPrevisto(p.id);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 hover:bg-amber-50 text-emerald-700 hover:text-amber-800 border border-emerald-200/80 hover:border-amber-300 rounded-full font-bold text-[10px] tracking-tight transition-all cursor-pointer group shadow-2xs"
+                                  title="Clique para desmarcar e voltar para PREVISTO"
+                                >
+                                  <CheckCircle2 className="w-2.5 h-2.5 group-hover:hidden" />
+                                  <RotateCcw className="w-2.5 h-2.5 hidden group-hover:inline text-amber-700" />
+                                  <span>PAGO</span>
+                                </button>
                               )}
                             </td>
                             <td className="py-2.5 px-3 text-center whitespace-nowrap">
@@ -1008,47 +1348,42 @@ export function App() {
                             </td>
                             <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1.5">
-                                {/* Se for previsto: botão para registrar pagamento */}
-                                {isPrevisto && (
+                                {/* Alternador de Status individual */}
+                                {isPrevisto ? (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleMarkAsPaid(p.id);
                                     }}
                                     className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
-                                    title="Confirmar Pagamento Efetivado"
+                                    title="Confirmar Pagamento (Marcar como PAGO)"
                                   >
                                     <CheckCircle2 className="w-4 h-4" />
                                   </button>
+                                ) : (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRevertToPrevisto(p.id);
+                                    }}
+                                    className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-md transition-colors"
+                                    title="Desmarcar Pagamento (Reverter para PREVISTO)"
+                                  >
+                                    <RotateCcw className="w-4 h-4" />
+                                  </button>
                                 )}
 
-                                {/* Visualizar Recibo diretamente nesta tela */}
+                                {/* Opção UNIFICADA de Recibo: Exibir Recibo (Conferência obrigatória antes da emissão/download) */}
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setViewingReceiptPayment(p);
                                   }}
-                                  className="p-1.5 text-blue-600 hover:bg-blue-100/70 rounded-md transition-colors"
-                                  title="Visualizar Recibo Oficial (1ª VIA)"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/90 rounded-lg transition-colors shadow-2xs"
+                                  title="Exibir Recibo Oficial (Conferência prévia obrigatória antes de baixar ou imprimir)"
                                 >
-                                  <Eye className="w-4 h-4" />
-                                </button>
-
-                                {/* Emitir Recibo (Download Individual do PDF) */}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    baixarPdfRecibo(p, contract);
-                                  }}
-                                  disabled={isPrevisto}
-                                  className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-md transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
-                                  title={
-                                    isPrevisto
-                                      ? 'Recibo disponível apenas após pagamento confirmado (status PAGO)'
-                                      : `Emitir PDF: ${gerarNomeArquivoRecibo(p)}`
-                                  }
-                                >
-                                  <Download className="w-4 h-4" />
+                                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Exibir Recibo</span>
                                 </button>
 
                                 {/* Editar */}
@@ -1064,13 +1399,14 @@ export function App() {
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </button>
 
-                                {/* Excluir */}
+                                {/* Excluir Parcela */}
                                 <button
+                                  type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleDeletePayment(p.id);
                                   }}
-                                  className="p-1.5 text-red-400 hover:text-red-600 rounded-md transition-colors"
+                                  className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
                                   title="Excluir Parcela"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -1108,44 +1444,26 @@ export function App() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
               {/* CSV Export */}
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
-                    <FileSpreadsheet className="w-5 h-5" />
+                  <div className="flex items-center gap-2.5 mb-1.5">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <FileSpreadsheet className="w-4 h-4" />
+                    </div>
+                    <h3 className="font-bold text-slate-900 text-sm">Exportar para Excel / CSV</h3>
                   </div>
-                  <h3 className="font-bold text-slate-900 text-sm">Exportar para Excel / CSV</h3>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-slate-500">
                     Baixe todos os registros de pagamentos formatados em planilha CSV (compatível com Microsoft Excel).
                   </p>
                 </div>
                 <button
                   onClick={handleExportCsv}
-                  className="mt-4 w-full py-2 px-3 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                  className="shrink-0 py-2 px-4 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-xs"
                 >
                   <Download className="w-4 h-4" />
                   Baixar Planilha CSV
-                </button>
-              </div>
-
-              {/* Batch PDF panel */}
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
-                <div>
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-bold text-slate-900 text-sm">Gerador de PDFs em Lote</h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Gere e baixe múltiplos recibos PDF de uma vez só com nomenclatura padronizada e anti-sobrescrita.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setIsBatchModalOpen(true)}
-                  className="mt-4 w-full py-2 px-3 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  Abrir Painel PDF
                 </button>
               </div>
             </div>
@@ -1197,14 +1515,6 @@ export function App() {
       </main>
 
       {/* Modals */}
-      <BatchPdfModal
-        isOpen={isBatchModalOpen}
-        onClose={() => setIsBatchModalOpen(false)}
-        payments={payments}
-        beneficiaries={beneficiaries}
-        contract={contract}
-      />
-
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => {
@@ -1259,10 +1569,13 @@ export function App() {
               <button
                 onClick={() => setViewingReceiptPayment(null)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors text-xs font-semibold"
-                title="Voltar ao Registro de Pagamentos"
+                title="Voltar ao Registro de Pagamentos (ou pressione ESC)"
               >
                 <ArrowRight className="w-4 h-4 rotate-180" />
                 <span className="hidden sm:inline">Voltar</span>
+                <kbd className="hidden sm:inline-block ml-1 text-[10px] font-mono text-slate-500 bg-slate-100 border border-slate-300 rounded px-1.5 py-0.5">
+                  ESC
+                </kbd>
               </button>
 
               <div className="h-5 w-px bg-slate-200 mx-1" />
@@ -1290,42 +1603,192 @@ export function App() {
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg shadow-2xs transition-colors"
-                title="Imprimir via do recibo"
+                type="button"
+                onClick={() => {
+                  if (viewingReceiptPayment.status === 'PREVISTO') {
+                    setConfirmDialog({
+                      isOpen: true,
+                      title: 'Parcela com Status PREVISTO',
+                      message: `A parcela nº ${viewingReceiptPayment.parcela} de ${viewingReceiptPayment.nome} está registrada como PREVISTO. Deseja registrar a quitação desta parcela agora para liberar a impressão do recibo oficial?`,
+                      details: [
+                        { label: 'Beneficiário (Cedente)', value: viewingReceiptPayment.nome },
+                        { label: 'Identificação', value: `Parcela nº ${viewingReceiptPayment.parcela}` },
+                        { label: 'Valor da Parcela', value: formatarMoeda(viewingReceiptPayment.valor) },
+                      ],
+                      subMessage:
+                        'Recibos oficiais de quitação plena exigem que a parcela esteja com status PAGO. Ao confirmar, o pagamento será liquidado e a impressão será aberta.',
+                      confirmLabel: 'Quitar e Imprimir Recibo',
+                      confirmVariant: 'emerald',
+                      onConfirm: () => {
+                        executeMarkAsPaid(viewingReceiptPayment.id);
+                        setViewingReceiptPayment((prev) =>
+                          prev ? { ...prev, status: 'PAGO' } : null
+                        );
+                        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+                        setTimeout(() => {
+                          imprimirElementoRecibo('receipt-print-area');
+                        }, 300);
+                      },
+                    });
+                    return;
+                  }
+                  imprimirElementoRecibo('receipt-print-area');
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                title={
+                  viewingReceiptPayment.status === 'PREVISTO'
+                    ? 'Parcela prevista: clique para quitar e imprimir via oficial'
+                    : 'Imprimir via oficial do recibo'
+                }
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span className="hidden md:inline">Imprimir</span>
               </button>
 
               <button
-                onClick={() => baixarPdfRecibo(viewingReceiptPayment, contract)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-all"
-                title={`Baixar PDF: ${gerarNomeArquivoRecibo(viewingReceiptPayment)}`}
+                type="button"
+                onClick={() => {
+                  if (viewingReceiptPayment.status === 'PREVISTO') {
+                    setConfirmDialog({
+                      isOpen: true,
+                      title: 'Parcela com Status PREVISTO',
+                      message: `A parcela nº ${viewingReceiptPayment.parcela} de ${viewingReceiptPayment.nome} está registrada como PREVISTO. Deseja registrar a quitação desta parcela agora para gerar o PDF oficial?`,
+                      details: [
+                        { label: 'Beneficiário (Cedente)', value: viewingReceiptPayment.nome },
+                        { label: 'Identificação', value: `Parcela nº ${viewingReceiptPayment.parcela}` },
+                        { label: 'Valor da Parcela', value: formatarMoeda(viewingReceiptPayment.valor) },
+                      ],
+                      subMessage:
+                        'Recibos oficiais de quitação plena exigem que a parcela esteja com status PAGO. Ao confirmar, o pagamento será liquidado e o download iniciado.',
+                      confirmLabel: 'Quitar e Baixar PDF',
+                      confirmVariant: 'emerald',
+                      onConfirm: () => {
+                        executeMarkAsPaid(viewingReceiptPayment.id);
+                        const updated = { ...viewingReceiptPayment, status: 'PAGO' as const };
+                        setViewingReceiptPayment(updated);
+                        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+                        setTimeout(() => {
+                          baixarPdfRecibo(updated, contract);
+                        }, 300);
+                      },
+                    });
+                    return;
+                  }
+                  baixarPdfRecibo(viewingReceiptPayment, contract);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-all cursor-pointer"
+                title={
+                  viewingReceiptPayment.status === 'PREVISTO'
+                    ? 'Parcela prevista: clique para quitar e baixar PDF'
+                    : `Baixar PDF: ${gerarNomeArquivoRecibo(viewingReceiptPayment)}`
+                }
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Baixar PDF</span>
               </button>
-
-              <button
-                onClick={() => setViewingReceiptPayment(null)}
-                className="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition-colors ml-1"
-                title="Fechar"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
           </header>
+
+          {/* AVISO INFORMATIVO LOGO ABAIXO DA BARRA (Não colado na folha A4) */}
+          {viewingReceiptPayment.status === 'PREVISTO' && (
+            <div className="bg-blue-50/95 border-b border-blue-200 px-4 sm:px-6 py-2.5 text-blue-900 text-xs flex items-center justify-between gap-3 shrink-0 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>
+                  <strong>Aviso Informativo:</strong> Esta parcela está registrada como <strong>PREVISTO</strong> no cronograma. A emissão do recibo de quitação definitiva estará disponível após a confirmação do pagamento (status PAGO).
+                </span>
+              </div>
+            </div>
+          )}
 
           <main className="flex-1 bg-slate-200/50 p-4 sm:p-6 lg:p-8 overflow-y-auto flex justify-center">
             <div className="shadow-xl rounded-sm overflow-hidden my-auto border border-slate-300 bg-white">
               <ReceiptDocument
                 payment={viewingReceiptPayment}
                 contract={contract}
-                onPrint={() => window.print()}
+                onPrint={
+                  viewingReceiptPayment.status === 'PREVISTO'
+                    ? undefined
+                    : () => imprimirElementoRecibo('receipt-print-area')
+                }
               />
             </div>
           </main>
+        </div>
+      )}
+
+      {/* Modal de Confirmação para Marcar como Pago, Reverter ou Excluir */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-5 sm:p-6 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3.5">
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                  confirmDialog.confirmVariant === 'emerald'
+                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                    : confirmDialog.confirmVariant === 'red'
+                    ? 'bg-red-50 text-red-600 border border-red-200'
+                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                }`}
+              >
+                {confirmDialog.confirmVariant === 'emerald' ? (
+                  <CheckCircle2 className="w-5 h-5" />
+                ) : confirmDialog.confirmVariant === 'red' ? (
+                  <Trash2 className="w-5 h-5" />
+                ) : (
+                  <RotateCcw className="w-5 h-5" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-slate-900">
+                  {confirmDialog.title}
+                </h3>
+                <p className="text-xs font-semibold text-slate-800 mt-1 leading-relaxed">
+                  {confirmDialog.message}
+                </p>
+
+                {confirmDialog.details && confirmDialog.details.length > 0 && (
+                  <div className="mt-3 p-3 bg-slate-50 border border-slate-200/90 rounded-xl space-y-1.5">
+                    {confirmDialog.details.map((d, i) => (
+                      <div key={i} className="flex justify-between items-center text-xs">
+                        <span className="text-slate-500 font-medium">{d.label}:</span>
+                        <span className="font-bold text-slate-900 font-mono">{d.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {confirmDialog.subMessage && (
+                  <p className="text-[11px] text-slate-500 mt-2.5 leading-relaxed bg-slate-100/60 p-2 rounded-lg border border-slate-200/50">
+                    {confirmDialog.subMessage}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmDialog.onConfirm}
+                className={`px-4 py-2 text-xs font-bold text-white rounded-lg shadow-xs transition-colors cursor-pointer ${
+                  confirmDialog.confirmVariant === 'emerald'
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : confirmDialog.confirmVariant === 'red'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-amber-600 hover:bg-amber-700'
+                }`}
+              >
+                {confirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
