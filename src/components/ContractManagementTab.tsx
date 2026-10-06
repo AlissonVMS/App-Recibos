@@ -359,12 +359,12 @@ export const ContractManagementTab: React.FC<ContractManagementTabProps> = ({
             return (
               <div
                 key={party.id}
-                className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs transition-all hover:border-slate-300"
+                className="bg-white border border-slate-200 rounded-xl overflow-visible shadow-xs transition-all hover:border-slate-300"
               >
                 {/* Cabeçalho do Card da Parte */}
                 <div
                   onClick={() => toggleParty(party.id)}
-                  className="p-4 bg-slate-50/80 hover:bg-slate-100/70 cursor-pointer flex items-center justify-between gap-3 select-none"
+                  className="p-4 bg-slate-50/80 hover:bg-slate-100/70 cursor-pointer flex items-center justify-between gap-3 select-none rounded-t-xl"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="w-7 h-7 rounded-lg bg-blue-100 text-blue-800 text-xs font-bold flex items-center justify-center shrink-0">
@@ -493,19 +493,14 @@ export const ContractManagementTab: React.FC<ContractManagementTabProps> = ({
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                         <div className="sm:col-span-5">
-                          <label className="block text-[11px] text-slate-500 font-medium mb-1">
-                            Instituição Financeira (Banco)
-                          </label>
-                          <input
-                            type="text"
-                            list="bacen-banks-list"
-                            value={party.banco}
-                            onChange={(e) =>
-                              handlePartyChange(party.id, 'banco', e.target.value)
-                            }
-                            placeholder="Ex: 104 - Caixa Econômica Federal"
-                            className="w-full text-xs rounded-lg border-slate-300 bg-slate-50 border p-2.5 focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500"
+                          <BacenBankSelect
+                            label="Instituição Financeira (Banco)"
                             required
+                            value={party.banco}
+                            onChange={(banco) =>
+                              handlePartyChange(party.id, 'banco', banco)
+                            }
+                            placeholder="Selecione o banco ou digite o código..."
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -637,14 +632,6 @@ export const ContractManagementTab: React.FC<ContractManagementTabProps> = ({
         </button>
       </div>
 
-      {/* Datalist com bancos BACEN para preenchimento ágil */}
-      <datalist id="bacen-banks-list">
-        {BACEN_PF_BANKS.map((b) => (
-          <option key={b.codigo} value={b.label}>
-            {b.label}
-          </option>
-        ))}
-      </datalist>
     </form>
   );
 };
