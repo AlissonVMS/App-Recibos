@@ -8,6 +8,7 @@ import {
   valorPorExtenso,
 } from './numberToWordsPtBr';
 import { extrairDadosTransferencia } from './transferHelper';
+import { extrairNomePuroBanco } from '../data/bacenBanks';
 
 export function sanitizarNomeArquivo(texto: string): string {
   return texto
@@ -576,10 +577,12 @@ export function renderizarPaginaRecibo(
     pagamento.formaPgto?.toUpperCase().includes('ESPÉCIE') ||
     pagamento.formaPgto?.toUpperCase().includes('ESPECIE');
 
+  const bancoNomePuroPix = extrairNomePuroBanco(pagamento.banco);
+
   let tokensP2: TextToken[] = [
     { text: 'Pagamento recebido através da ', bold: false },
     {
-      text: `chave\u00A0Pix\u00A0nº\u00A0${pagamento.chave}, ${pagamento.banco}`,
+      text: `chave\u00A0Pix\u00A0nº\u00A0${pagamento.chave}${bancoNomePuroPix ? `, ${bancoNomePuroPix}` : ''}`,
       bold: true,
     },
     { text: '.', bold: false },
