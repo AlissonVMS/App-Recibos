@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Beneficiary, ContractConfig } from '../types';
 import { BACEN_PF_BANKS } from '../data/bacenBanks';
+import { BacenBankSelect } from './BacenBankSelect';
 import {
   formatarMoeda,
   formatarNumeroMoeda,
@@ -241,34 +242,18 @@ export const ContractManagementTab: React.FC<ContractManagementTabProps> = ({
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-              Banco do Pagador (COMPE - Instituição) *
-            </label>
-            <div className="relative">
-              <select
-                value={contractForm.pagadorBanco || '104 - Caixa Econômica Federal'}
-                onChange={(e) =>
-                  setContractForm({
-                    ...contractForm,
-                    pagadorBanco: e.target.value,
-                  })
-                }
-                className="w-full text-sm font-semibold text-slate-900 rounded-lg border-slate-300 bg-slate-50 border p-2.5 pr-8 focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500 appearance-none truncate"
-                required
-              >
-                {BACEN_PF_BANKS.map((b) => (
-                  <option key={b.codigo} value={b.label}>
-                    {b.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-            <span className="text-[10px] text-slate-500 mt-1 block">
-              Base oficial BACEN STR. Utilizado para diferenciar transferências internas (TEV) de externas (TED).
-            </span>
-          </div>
+          <BacenBankSelect
+            label="Banco do Pagador (COMPE - Instituição)"
+            required
+            value={contractForm.pagadorBanco || '104 - Caixa Econômica Federal'}
+            onChange={(banco) =>
+              setContractForm({
+                ...contractForm,
+                pagadorBanco: banco,
+              })
+            }
+            helperText="Base oficial BACEN STR. Utilizado para diferenciar transferências internas (TEV) de externas (TED)."
+          />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
