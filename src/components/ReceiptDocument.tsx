@@ -126,7 +126,13 @@ export const ReceiptDocument: React.FC<ReceiptDocumentProps> = ({
         >
           {transferInfo.isTransfer ? (
             <>
-              Pagamento recebido através de <strong>{transferInfo.descricaoTipo}</strong>, creditado no banco <strong>{transferInfo.bancoFormatado}</strong>{transferInfo.agencia ? <>, agência {transferInfo.agencia}</> : null}{transferInfo.conta ? <>, conta {transferInfo.tipoConta} {transferInfo.conta}</> : null}.
+              Pagamento recebido através de <strong>{transferInfo.descricaoTipo}</strong>, creditado no banco <strong>{transferInfo.bancoNomePuro}</strong>{transferInfo.agencia && transferInfo.conta ? (
+                <>, Agência número {transferInfo.agencia} e Conta {transferInfo.tipoContaFormatada} de número {transferInfo.conta}</>
+              ) : transferInfo.agencia ? (
+                <>, Agência número {transferInfo.agencia}</>
+              ) : transferInfo.conta ? (
+                <>, Conta {transferInfo.tipoContaFormatada} de número {transferInfo.conta}</>
+              ) : null}.
             </>
           ) : isEspecie ? (
             <>

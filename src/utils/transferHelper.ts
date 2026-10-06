@@ -1,14 +1,18 @@
 import { ContractConfig, PaymentRecord, Beneficiary } from '../types';
-import { extrairCodigoCompe, formatarBancoCompe } from '../data/bacenBanks';
+import { extrairCodigoCompe, extrairNomePuroBanco, formatarBancoCompe } from '../data/bacenBanks';
 
 export interface TransferInfo {
   isTransfer: boolean;
   tipo: 'TEV' | 'TED';
   descricaoTipo: string;
   bancoFormatado: string;
+  bancoNomePuro: string;
   agencia: string;
   conta: string;
   tipoConta: string;
+  tipoContaFormatada: string;
+  detalhesTexto: string;
+  detalhesHtml: string;
   texto: string;
   textoHtml: string;
 }
@@ -19,10 +23,10 @@ export interface TransferInfo {
  * e gera a redação exata solicitada:
  *
  * Em caso de pagamento para o mesmo banco:
- * "Pagamento recebido através de TEV (Transferência Eletrônica de Valores), creditado no banco 104 - Caixa Econômica Federal, agência 3693, conta poupança 786779864-2."
+ * "Pagamento recebido através de TEV (Transferência Eletrônica de Valores), creditado no banco Caixa Econômica Federal, Agência número 3693 e Conta Poupança de número 786779864-2."
  *
  * Para outros bancos:
- * "Pagamento recebido através de TED (Transferência Eletrônica Disponível), creditado no banco [Código - Nome], agência [agência], conta [tipo] [número]."
+ * "Pagamento recebido através de TED (Transferência Eletrônica Disponível), creditado no banco [Nome Banco], Agência número [agência] e Conta [TipoConta] de número [conta]."
  */
 export function extrairDadosTransferencia(
   pagamento: PaymentRecord,
@@ -44,11 +48,12 @@ export function extrairDadosTransferencia(
     beneficiario?.banco || pagamento.banco || '104 - Caixa Econômica Federal';
   const recebedorBancoFormatado = formatarBancoCompe(recebedorBancoRaw);
   const recebedorCompe = extrairCodigoCompe(recebedorBancoFormatado);
+  const bancoNomePuro = extrairNomePuroBanco(recebedorBancoRaw);
 
   // Agência, Conta e Tipo de Conta
   let agencia = beneficiario?.agencia || '';
   let conta = beneficiario?.conta || '';
-  let tipoConta = (beneficiario?.tipoConta || 'poupança').toLowerCase();
+  let tipoConta = (beneficiario?.tipoConta || 'POUPANÇA').toUpperCase();
 
   // Se não constar no beneficiário, tenta extrair do campo chave do pagamento
   if (!agencia || !conta) {
@@ -59,7 +64,7 @@ export function extrairDadosTransferencia(
 
     if (agMatch) agencia = agMatch[1];
     if (ccMatch) conta = ccMatch[1];
-    if (tipoMatch) tipoConta = tipoMatch[1].toLowerCase();
+    if (tipoMatch) tipoConta = tipoMatch[1].toUpperCase();
   }
 
   // Verifica se é o mesmo banco
@@ -87,28 +92,37 @@ export function extrairDadosTransferencia(
     ? 'TEV (Transferência Eletrônica de Valores)'
     : 'TED (Transferência Eletrônica Disponível)';
 
-  // Constrói partes dos detalhes bancários
-  const partes: string[] = [];
-  if (agencia) partes.push(`agência ${agencia}`);
-  if (conta) partes.push(`conta ${tipoConta} ${conta}`);
-  const detalhesStr = partes.join(', ');
+  const tipoContaFormatada = tipoConta.includes('POUP') ? 'Poupança' : 'Corrente';
 
-  const texto = detalhesStr
-    ? `Pagamento recebido através de ${descricaoTipo}, creditado no banco ${recebedorBancoFormatado}, ${detalhesStr}.`
-    : `Pagamento recebido através de ${descricaoTipo}, creditado no banco ${recebedorBancoFormatado}.`;
+  let detalhesTexto = '';
+  let detalhesHtml = '';
 
-  const textoHtml = detalhesStr
-    ? `Pagamento recebido através de <strong>${descricaoTipo}</strong>, creditado no banco <strong>${recebedorBancoFormatado}</strong>, ${detalhesStr}.`
-    : `Pagamento recebido através de <strong>${descricaoTipo}</strong>, creditado no banco <strong>${recebedorBancoFormatado}</strong>.`;
+  if (agencia && conta) {
+    detalhesTexto = `, Agência número ${agencia} e Conta ${tipoContaFormatada} de número ${conta}`;
+    detalhesHtml = `, Agência número <strong>${agencia}</strong> e Conta ${tipoContaFormatada} de número <strong>${conta}</strong>`;
+  } else if (agencia) {
+    detalhesTexto = `, Agência número ${agencia}`;
+    detalhesHtml = `, Agência número <strong>${agencia}</strong>`;
+  } else if (conta) {
+    detalhesTexto = `, Conta ${tipoContaFormatada} de número ${conta}`;
+    detalhesHtml = `, Conta ${tipoContaFormatada} de número <strong>${conta}</strong>`;
+  }
+
+  const texto = `Pagamento recebido através de ${descricaoTipo}, creditado no banco ${bancoNomePuro}${detalhesTexto}.`;
+  const textoHtml = `Pagamento recebido através de <strong>${descricaoTipo}</strong>, creditado no banco <strong>${bancoNomePuro}</strong>${detalhesHtml}.`;
 
   return {
     isTransfer,
     tipo,
     descricaoTipo,
     bancoFormatado: recebedorBancoFormatado,
+    bancoNomePuro,
     agencia,
     conta,
     tipoConta,
+    tipoContaFormatada,
+    detalhesTexto,
+    detalhesHtml,
     texto,
     textoHtml,
   };

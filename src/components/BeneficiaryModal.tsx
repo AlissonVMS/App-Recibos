@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Beneficiary } from '../types';
 import { formatarNumeroMoeda } from '../utils/numberToWordsPtBr';
-import { X, Save, Lock, Info, Building2, ChevronDown } from 'lucide-react';
+import { X, Save, Lock, Info, Building2, ChevronDown, Search } from 'lucide-react';
+import { BACEN_PF_BANKS, formatarBancoCompe } from '../data/bacenBanks';
 
 interface BeneficiaryModalProps {
   isOpen: boolean;
@@ -19,6 +20,39 @@ export const BeneficiaryModal: React.FC<BeneficiaryModalProps> = ({
   if (!isOpen || !beneficiary) return null;
 
   const [formData, setFormData] = useState<Beneficiary>({ ...beneficiary });
+  const [isBankDropdownOpen, setIsBankDropdownOpen] = useState<boolean>(false);
+  const [bankSearch, setBankSearch] = useState<string>('');
+  const bankDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fecha o dropdown se clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        bankDropdownRef.current &&
+        !bankDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsBankDropdownOpen(false);
+      }
+    };
+    if (isBankDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isBankDropdownOpen]);
+
+  // Filtra bancos pelo código COMPE ou pelo nome da instituição
+  const filteredBanks = useMemo(() => {
+    if (!bankSearch.trim()) return BACEN_PF_BANKS;
+    const term = bankSearch.toLowerCase().trim();
+    return BACEN_PF_BANKS.filter(
+      (b) =>
+        b.codigo.includes(term) ||
+        b.nome.toLowerCase().includes(term) ||
+        b.label.toLowerCase().includes(term)
+    );
+  }, [bankSearch]);
 
   const handleChange = (field: keyof Beneficiary, value: any) => {
     setFormData((prev) => ({
@@ -158,17 +192,69 @@ export const BeneficiaryModal: React.FC<BeneficiaryModalProps> = ({
               Dados Bancários & Chave PIX
             </h3>
             <div className="space-y-3">
-              <div>
+              <div className="relative" ref={bankDropdownRef}>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                  Instituição Financeira (Banco)
+                  Instituição Financeira (Banco) *
                 </label>
-                <input
-                  type="text"
-                  value={formData.banco}
-                  onChange={(e) => handleChange('banco', e.target.value)}
-                  className="w-full text-sm rounded-lg border-slate-300 bg-slate-50 border p-2.5 focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500"
-                  required
-                />
+                <div
+                  onClick={() => setIsBankDropdownOpen(!isBankDropdownOpen)}
+                  className="w-full text-sm rounded-lg border-slate-300 bg-slate-50 border p-2.5 flex items-center justify-between cursor-pointer hover:border-blue-500 hover:bg-white transition-colors"
+                >
+                  <span className="font-semibold text-slate-900 truncate">
+                    {formData.banco
+                      ? formatarBancoCompe(formData.banco)
+                      : 'Selecione a instituição financeira...'}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                </div>
+
+                {isBankDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 space-y-2 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Buscar por código COMPE (ex: 104) ou nome..."
+                        value={bankSearch}
+                        onChange={(e) => setBankSearch(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:outline-hidden"
+                      />
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 text-xs">
+                      {filteredBanks.length === 0 ? (
+                        <div className="py-4 text-center text-slate-400 text-xs">
+                          Nenhum banco encontrado para "{bankSearch}".
+                        </div>
+                      ) : (
+                        filteredBanks.map((b) => (
+                          <button
+                            key={b.codigo}
+                            type="button"
+                            onClick={() => {
+                              handleChange('banco', b.label);
+                              setIsBankDropdownOpen(false);
+                              setBankSearch('');
+                            }}
+                            className={`w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between transition-colors rounded-md ${
+                              formatarBancoCompe(formData.banco) === b.label
+                                ? 'bg-blue-50/70 text-blue-700 font-bold'
+                                : 'text-slate-700'
+                            }`}
+                          >
+                            <span className="truncate">{b.label}</span>
+                            {formatarBancoCompe(formData.banco) === b.label && (
+                              <span className="text-[10px] text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded font-bold">
+                                Selecionado
+                              </span>
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-3">

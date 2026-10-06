@@ -8,15 +8,100 @@ import { extrairDadosTransferencia } from './transferHelper';
 import { formatarBancoCompe } from '../data/bacenBanks';
 
 /**
- * Imprime o recibo oficial de forma confiável e direta através do diálogo nativo do navegador,
- * utilizando as regras @media print já configuradas para papel A4 e tipografia jurídica.
+ * Imprime o recibo oficial de forma confiável e direta através de iframe isolado,
+ * garantindo tipografia perfeita, isolamento de DOM e diálogo de impressão A4 imediato.
  */
-export function imprimirElementoRecibo(_elementId: string = 'receipt-print-area'): void {
+export function imprimirElementoRecibo(elementId: string = 'receipt-print-area'): void {
   try {
-    window.focus();
-    window.print();
+    const element = document.getElementById(elementId);
+    if (!element) {
+      window.print();
+      return;
+    }
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      window.print();
+      return;
+    }
+
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="utf-8" />
+          <title>Recibo Oficial de Pagamento</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 0;
+            }
+            html, body {
+              margin: 0;
+              padding: 0;
+              background-color: white !important;
+              color: black !important;
+              font-family: "Times New Roman", Times, Georgia, serif;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            * {
+              box-sizing: border-box;
+            }
+            .print-wrapper {
+              width: 210mm;
+              min-height: 297mm;
+              padding-top: 30mm;
+              padding-left: 30mm;
+              padding-right: 20mm;
+              padding-bottom: 20mm;
+              margin: 0 auto;
+              background: white;
+              color: black;
+              line-height: 1.5;
+            }
+            p {
+              margin: 0;
+              padding: 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-wrapper">
+            ${element.innerHTML}
+          </div>
+        </body>
+      </html>
+    `);
+    doc.close();
+
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch {
+        window.print();
+      } finally {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 30000);
+      }
+    }, 250);
   } catch (err) {
     console.error('Erro ao acionar janela de impressão:', err);
+    window.print();
   }
 }
 
