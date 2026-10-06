@@ -13,11 +13,12 @@ import { BeneficiaryModal } from './components/BeneficiaryModal';
 import { ContractSettingsModal } from './components/ContractSettingsModal';
 import { ContractManagementTab } from './components/ContractManagementTab';
 import { DashboardCharts } from './components/DashboardCharts';
-import { ReceiptsTab } from './components/ReceiptsTab';
+import { ReceiptsBatchPreviewModal } from './components/ReceiptsBatchPreviewModal';
 import {
   baixarPdfRecibo,
   baixarPdfRecibosZip,
   emitirRecibos,
+  gerarNomeArquivoLote,
   gerarNomeArquivoRecibo,
 } from './utils/pdfGenerator';
 import {
@@ -46,6 +47,9 @@ import {
   Clock,
   X,
   Loader2,
+  AlertCircle,
+  Archive,
+  Printer,
 } from 'lucide-react';
 
 export function App() {
@@ -78,7 +82,7 @@ export function App() {
   }, [payments]);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'geral' | 'tabela' | 'recibo' | 'contrato' | 'exportar'>('geral');
+  const [activeTab, setActiveTab] = useState<'geral' | 'tabela' | 'contrato' | 'exportar'>('geral');
   const [selectedReceiptPaymentId, setSelectedReceiptPaymentId] = useState<string>(
     INITIAL_PAYMENTS[0]?.id || ''
   );
@@ -124,45 +128,42 @@ export function App() {
   // Seleção múltipla para emissão de recibos na tabela de pagamentos
   const [selectedTablePaymentIds, setSelectedTablePaymentIds] = useState<Set<string>>(new Set());
   const [viewingReceiptPayment, setViewingReceiptPayment] = useState<PaymentRecord | null>(null);
-  const [isDownloadingZip, setIsDownloadingZip] = useState<boolean>(false);
+  const [isBatchPreviewModalOpen, setIsBatchPreviewModalOpen] = useState<boolean>(false);
 
   // Filtra pagamentos filtrados que possuem status PAGO
   const filteredPaidPayments = filteredPayments.filter(
     (p) => (p.status || 'PAGO') === 'PAGO'
   );
 
+  // Todos os pagamentos selecionados na tabela (PAGO e PREVISTO)
+  const selectedTablePayments = payments.filter((p) => selectedTablePaymentIds.has(p.id));
+
   // Pagamentos selecionados que estão com status PAGO
-  const selectedPaidTablePayments = payments.filter(
-    (p) => selectedTablePaymentIds.has(p.id) && (p.status || 'PAGO') === 'PAGO'
+  const selectedPaidTablePayments = selectedTablePayments.filter(
+    (p) => (p.status || 'PAGO') === 'PAGO'
   );
 
-  const selectedPaidTableCount = selectedPaidTablePayments.length;
-  const selectedPaidTotalValor = selectedPaidTablePayments.reduce((acc, p) => acc + p.valor, 0);
+  // Pagamentos selecionados que estão com status PREVISTO
+  const selectedPrevistoTablePayments = selectedTablePayments.filter(
+    (p) => p.status === 'PREVISTO'
+  );
 
-  // Ação de emissão de recibos na tabela (1 = PDF avulso, múltiplos = ZIP com todos)
-  const handleEmitirRecibosTabela = async () => {
-    let targetPayments = selectedPaidTablePayments;
+  // Conjunto de pagamentos enviados para conferência e emissão:
+  // Se houver seleção manual (via caixas), usa os selecionados. Caso contrário, usa os filtrados da tabela.
+  const paymentsForEmission =
+    selectedTablePayments.length > 0 ? selectedTablePayments : filteredPayments;
 
-    // Se nenhum item foi marcado com checkbox, mas existem parcelas pagas no filtro atual
-    if (targetPayments.length === 0) {
-      if (filteredPaidPayments.length === 0) {
-        alert('Nenhuma parcela com status PAGO encontrada para emissão de recibo.');
-        return;
-      }
-      targetPayments = filteredPaidPayments;
+  const paidPaymentsForEmission = paymentsForEmission.filter(
+    (p) => (p.status || 'PAGO') === 'PAGO'
+  );
+
+  // Abre a tela de conferência de recibos antes de gerar os arquivos
+  const handleOpenReceiptsPreview = () => {
+    if (paidPaymentsForEmission.length === 0) {
+      alert('Nenhuma parcela com status PAGO selecionada para emissão de recibo.');
+      return;
     }
-
-    setIsDownloadingZip(true);
-    try {
-      if (targetPayments.length === 1) {
-        baixarPdfRecibo(targetPayments[0], contract);
-      } else {
-        const nomeZip = `RECIBOS_PAGAMENTOS_${targetPayments.length}_ARQUIVOS.zip`;
-        await baixarPdfRecibosZip(targetPayments, contract, nomeZip);
-      }
-    } finally {
-      setIsDownloadingZip(false);
-    }
+    setIsBatchPreviewModalOpen(true);
   };
 
   // Selected payment for individual receipt view
@@ -426,17 +427,6 @@ export function App() {
             >
               <FileSpreadsheet className="w-4 h-4" />
               Registro de Pagamentos ({payments.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('recibo')}
-              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
-                activeTab === 'recibo'
-                  ? 'bg-slate-800 text-blue-400 font-semibold shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              Emitir Recibo
             </button>
             <button
               onClick={() => setActiveTab('contrato')}
@@ -707,25 +697,14 @@ export function App() {
                   Exportar CSV
                 </button>
                 <button
-                  onClick={handleEmitirRecibosTabela}
-                  disabled={isDownloadingZip}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all disabled:opacity-50"
-                  title={
-                    selectedPaidTableCount > 1
-                      ? `Emitir ${selectedPaidTableCount} recibos em arquivo ZIP`
-                      : selectedPaidTableCount === 1
-                      ? 'Emitir recibo individual em PDF'
-                      : 'Emitir recibos das parcelas pagas selecionadas'
-                  }
+                  onClick={handleOpenReceiptsPreview}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all"
+                  title="Conferir e emitir recibos das parcelas pagas"
                 >
-                  {isDownloadingZip ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <FileText className="w-3.5 h-3.5" />
-                  )}
-                  {selectedPaidTableCount > 1
-                    ? `Emitir Recibos (${selectedPaidTableCount})`
-                    : selectedPaidTableCount === 1
+                  <FileText className="w-3.5 h-3.5" />
+                  {paidPaymentsForEmission.length > 1
+                    ? `Emitir Recibos (${paidPaymentsForEmission.length})`
+                    : paidPaymentsForEmission.length === 1
                     ? 'Emitir Recibo (1)'
                     : 'Emitir Recibo'}
                 </button>
@@ -785,26 +764,47 @@ export function App() {
             </div>
 
             {/* Barra Conveniente de Seleção para Emissão de Recibos */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 px-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
-              <div className="flex items-center gap-2">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold text-slate-700">
-                  {selectedPaidTableCount > 0 ? (
+                  {selectedTablePayments.length > 0 ? (
                     <>
-                      <strong className="text-blue-700 font-bold">{selectedPaidTableCount}</strong>{' '}
-                      recibo{selectedPaidTableCount > 1 ? 's' : ''} pago{selectedPaidTableCount > 1 ? 's' : ''} selecionado{selectedPaidTableCount > 1 ? 's' : ''} •{' '}
-                      <span className="font-mono font-bold text-slate-900">
-                        {formatarMoeda(selectedPaidTotalValor)}
+                      <strong className="text-blue-700 font-bold">{selectedTablePayments.length}</strong>{' '}
+                      parcela{selectedTablePayments.length > 1 ? 's' : ''} selecionada{selectedTablePayments.length > 1 ? 's' : ''} •{' '}
+                      <span className="text-emerald-700 font-bold">
+                        {selectedPaidTablePayments.length} paga{selectedPaidTablePayments.length > 1 ? 's' : ''} ({formatarMoeda(selectedPaidTablePayments.reduce((acc, p) => acc + p.valor, 0))})
                       </span>
                     </>
                   ) : (
                     <span className="text-slate-500">
-                      Nenhum recibo selecionado. Marque as caixas de seleção da tabela para emitir em lote.
+                      Nenhuma parcela marcada manualmente. Clique nas caixas de seleção da tabela para marcar em lote.
                     </span>
                   )}
                 </span>
+
+                {/* Aviso compacto quando itens PREVISTOS estão na seleção */}
+                {selectedPrevistoTablePayments.length > 0 && (
+                  <span className="bg-amber-50 text-amber-900 border border-amber-300/80 px-2.5 py-1 rounded-lg font-medium text-[11px] inline-flex items-center gap-1.5 shadow-2xs">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>
+                      <strong>Atenção:</strong> Foram marcados {selectedTablePayments.length} itens no total, incluindo {selectedPrevistoTablePayments.length} com status PREVISTO, apenas as {selectedPaidTablePayments.length} parcelas pagas estão sendo emitidas.
+                    </span>
+                  </span>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allIds = filteredPayments.map((p) => p.id);
+                    setSelectedTablePaymentIds(new Set(allIds));
+                  }}
+                  className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-md border border-slate-300 transition-colors"
+                  title="Selecionar todos os itens exibidos (pagos e previstos)"
+                >
+                  Marcar Todos ({filteredPayments.length})
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -815,7 +815,7 @@ export function App() {
                   }}
                   className="px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md border border-blue-200 transition-colors"
                 >
-                  Marcar Todos os Pagos ({payments.filter((p) => (p.status || 'PAGO') === 'PAGO').length})
+                  Marcar Somente Pagos ({payments.filter((p) => (p.status || 'PAGO') === 'PAGO').length})
                 </button>
                 {selectedTablePaymentIds.size > 0 && (
                   <button
@@ -839,8 +839,8 @@ export function App() {
                         <input
                           type="checkbox"
                           checked={
-                            filteredPaidPayments.length > 0 &&
-                            filteredPaidPayments.every((p) =>
+                            filteredPayments.length > 0 &&
+                            filteredPayments.every((p) =>
                               selectedTablePaymentIds.has(p.id)
                             )
                           }
@@ -848,19 +848,19 @@ export function App() {
                             if (e.target.checked) {
                               setSelectedTablePaymentIds((prev) => {
                                 const next = new Set(prev);
-                                filteredPaidPayments.forEach((p) => next.add(p.id));
+                                filteredPayments.forEach((p) => next.add(p.id));
                                 return next;
                               });
                             } else {
                               setSelectedTablePaymentIds((prev) => {
                                 const next = new Set(prev);
-                                filteredPaidPayments.forEach((p) => next.delete(p.id));
+                                filteredPayments.forEach((p) => next.delete(p.id));
                                 return next;
                               });
                             }
                           }}
                           className="rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                          title="Marcar/Desmarcar todas as parcelas pagas visíveis"
+                          title="Marcar/Desmarcar todas as parcelas visíveis (pagas e previstas)"
                         />
                       </th>
                       <th className="py-2.5 px-3.5 font-semibold">Beneficiário</th>
@@ -902,21 +902,17 @@ export function App() {
                           <tr
                             key={p.id}
                             onClick={() => {
-                              if (!isPrevisto) {
-                                setSelectedTablePaymentIds((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(p.id)) next.delete(p.id);
-                                  else next.add(p.id);
-                                  return next;
-                                });
-                              }
+                              setSelectedTablePaymentIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(p.id)) next.delete(p.id);
+                                else next.add(p.id);
+                                return next;
+                              });
                             }}
-                            className={`transition-colors ${
-                              isPrevisto
-                                ? 'hover:bg-slate-50/80'
-                                : isSelected
-                                ? 'bg-blue-50/70 hover:bg-blue-50 cursor-pointer'
-                                : 'hover:bg-slate-50/80 cursor-pointer'
+                            className={`transition-colors cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-50/70 hover:bg-blue-50'
+                                : 'hover:bg-slate-50/80'
                             }`}
                           >
                             <td
@@ -926,7 +922,6 @@ export function App() {
                               <input
                                 type="checkbox"
                                 checked={isSelected}
-                                disabled={isPrevisto}
                                 onChange={() => {
                                   setSelectedTablePaymentIds((prev) => {
                                     const next = new Set(prev);
@@ -935,17 +930,13 @@ export function App() {
                                     return next;
                                   });
                                 }}
-                                className={`rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 ${
-                                  isPrevisto
-                                    ? 'opacity-25 cursor-not-allowed'
-                                    : 'cursor-pointer'
-                                }`}
+                                className="rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                                 title={
                                   isPrevisto
-                                    ? 'Apenas parcelas com status PAGO podem ter recibo emitido'
+                                    ? 'Parcela com status PREVISTO (não gera recibo civil)'
                                     : isSelected
                                     ? 'Desmarcar parcela'
-                                    : 'Selecionar parcela para emissão de recibo'
+                                    : 'Selecionar parcela'
                                 }
                               />
                             </td>
@@ -1093,22 +1084,7 @@ export function App() {
           </div>
         )}
 
-        {/* TAB 3: EMISSÃO DE RECIBOS (INDIVIDUAL E EM LOTE) */}
-        {activeTab === 'recibo' && (
-          <ReceiptsTab
-            payments={payments}
-            beneficiaries={beneficiaries}
-            contract={contract}
-            selectedReceiptPaymentId={selectedReceiptPaymentId}
-            onSelectReceiptPaymentId={setSelectedReceiptPaymentId}
-            onEditPayment={(p) => {
-              setEditingPayment(p);
-              setIsPaymentModalOpen(true);
-            }}
-          />
-        )}
-
-        {/* TAB 4: EXPORTAR & BACKUP */}
+        {/* TAB 3: GESTÃO DO CONTRATO & PARTES */}
         {activeTab === 'exportar' && (
           <div className="max-w-3xl mx-auto space-y-6">
             <div>
@@ -1261,41 +1237,91 @@ export function App() {
         }}
       />
 
-      {/* Quick View Receipt Modal (Visualização e Emissão na Mesma Tela) */}
+      {/* Visualização de Recibo em Tela Cheia (Mesmo espaço da janela principal - Tema Claro) */}
       {viewingReceiptPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl overflow-hidden my-auto max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
-            <div className="bg-slate-900 px-5 py-3.5 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5">
-                <FileText className="w-5 h-5 text-blue-400" />
-                <div>
-                  <h3 className="text-sm font-bold">
-                    Visualização do Recibo Oficial • {viewingReceiptPayment.nome} (Parcela nº {viewingReceiptPayment.parcela})
-                  </h3>
-                  <span className="text-[11px] text-slate-300 font-mono">
-                    Valor: {formatarMoeda(viewingReceiptPayment.valor)} • Status: {viewingReceiptPayment.status || 'PAGO'}
-                  </span>
-                </div>
-              </div>
+        <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col w-screen h-screen overflow-hidden animate-in fade-in duration-150">
+          <header className="bg-white border-b border-slate-200 text-slate-900 px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 z-20 shadow-2xs">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setViewingReceiptPayment(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
-                title="Fechar visualização"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors text-xs font-semibold"
+                title="Voltar ao Registro de Pagamentos"
+              >
+                <ArrowRight className="w-4 h-4 rotate-180" />
+                <span className="hidden sm:inline">Voltar</span>
+              </button>
+
+              <div className="h-5 w-px bg-slate-200 mx-1" />
+
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200 shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                    {viewingReceiptPayment.nome}
+                    <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                      Parcela nº {viewingReceiptPayment.parcela}
+                    </span>
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      {viewingReceiptPayment.status || 'PAGO'}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-mono hidden sm:block">
+                    Valor: {formatarMoeda(viewingReceiptPayment.valor)} • CPF: {viewingReceiptPayment.cpf}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg shadow-2xs transition-colors"
+                title="Imprimir via do recibo"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Imprimir</span>
+              </button>
+
+              <button
+                onClick={() => baixarPdfRecibo(viewingReceiptPayment, contract)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-all"
+                title={`Baixar PDF: ${gerarNomeArquivoRecibo(viewingReceiptPayment)}`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Baixar PDF</span>
+              </button>
+
+              <button
+                onClick={() => setViewingReceiptPayment(null)}
+                className="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition-colors ml-1"
+                title="Fechar"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
+          </header>
 
-            <div className="p-4 sm:p-6 overflow-y-auto bg-slate-100/90 flex justify-center">
+          <main className="flex-1 bg-slate-200/50 p-4 sm:p-6 lg:p-8 overflow-y-auto flex justify-center">
+            <div className="shadow-xl rounded-sm overflow-hidden my-auto border border-slate-300 bg-white">
               <ReceiptDocument
                 payment={viewingReceiptPayment}
                 contract={contract}
                 onPrint={() => window.print()}
               />
             </div>
-          </div>
+          </main>
         </div>
       )}
+
+      {/* Modal de Conferência de Recibos antes da Emissão */}
+      <ReceiptsBatchPreviewModal
+        isOpen={isBatchPreviewModalOpen}
+        onClose={() => setIsBatchPreviewModalOpen(false)}
+        selectedPayments={paymentsForEmission}
+        contract={contract}
+      />
     </div>
   );
 }
