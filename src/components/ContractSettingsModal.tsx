@@ -266,12 +266,12 @@ export const ContractSettingsModal: React.FC<ContractSettingsModalProps> = ({
                   return (
                     <div
                       key={party.id}
-                      className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs transition-all"
+                      className="bg-white border border-slate-200 rounded-xl overflow-visible shadow-xs transition-all"
                     >
                       {/* Cabeçalho do Card da Parte */}
                       <div
                         onClick={() => toggleParty(party.id)}
-                        className="p-3.5 bg-slate-50/80 hover:bg-slate-100/60 cursor-pointer flex items-center justify-between gap-3 select-none"
+                        className="p-3.5 bg-slate-50/80 hover:bg-slate-100/60 cursor-pointer flex items-center justify-between gap-3 select-none rounded-t-xl"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-800 text-xs font-bold flex items-center justify-center shrink-0">
@@ -400,18 +400,14 @@ export const ContractSettingsModal: React.FC<ContractSettingsModalProps> = ({
                             </span>
                             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
                               <div className="sm:col-span-5">
-                                <label className="block text-[10px] text-slate-500 font-medium mb-1">
-                                  Banco
-                                </label>
-                                <input
-                                  type="text"
-                                  value={party.banco}
-                                  onChange={(e) =>
-                                    handlePartyChange(party.id, 'banco', e.target.value)
-                                  }
-                                  placeholder="Ex: Caixa Econômica"
-                                  className="w-full text-xs rounded-lg border-slate-300 bg-slate-50 border p-2 focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500"
+                                <BacenBankSelect
+                                  label="Banco"
                                   required
+                                  value={party.banco}
+                                  onChange={(banco) =>
+                                    handlePartyChange(party.id, 'banco', banco)
+                                  }
+                                  placeholder="Selecione o banco ou digite o código..."
                                 />
                               </div>
                               <div className="sm:col-span-2">

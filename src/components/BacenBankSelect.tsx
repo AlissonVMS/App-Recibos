@@ -71,7 +71,7 @@ export const BacenBankSelect: React.FC<BacenBankSelectProps> = ({
   };
 
   return (
-    <div className={`relative ${className}`} ref={containerRef}>
+    <div className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`} ref={containerRef}>
       {label && (
         <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
           {label} {required && <span className="text-red-500">*</span>}
