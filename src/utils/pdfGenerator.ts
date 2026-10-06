@@ -7,6 +7,7 @@ import {
   MESES_PT_BR,
   valorPorExtenso,
 } from './numberToWordsPtBr';
+import { extrairDadosTransferencia } from './transferHelper';
 
 export function sanitizarNomeArquivo(texto: string): string {
   return texto
@@ -570,7 +571,7 @@ export function renderizarPaginaRecibo(
   cursorY += lineHeight;
 
   // 4. Pagamento recebido... (fonte 12, justificado, espaçamento 1,5)
-  const isTed = pagamento.formaPgto?.toUpperCase().includes('TED');
+  const transferInfo = extrairDadosTransferencia(pagamento, contrato);
   const isEspecie =
     pagamento.formaPgto?.toUpperCase().includes('ESPÉCIE') ||
     pagamento.formaPgto?.toUpperCase().includes('ESPECIE');
@@ -584,15 +585,31 @@ export function renderizarPaginaRecibo(
     { text: '.', bold: false },
   ];
 
-  if (isTed) {
+  if (transferInfo.isTransfer) {
     tokensP2 = [
       { text: 'Pagamento recebido através de ', bold: false },
-      {
-        text: `transferência bancária (TED), ${pagamento.banco} (${pagamento.chave})`,
-        bold: true,
-      },
-      { text: '.', bold: false },
+      { text: transferInfo.descricaoTipo, bold: true },
+      { text: ', creditado no banco ', bold: false },
+      { text: transferInfo.bancoNomePuro, bold: true },
     ];
+    if (transferInfo.agencia && transferInfo.conta) {
+      tokensP2.push({
+        text: `, Agência número ${transferInfo.agencia} e Conta ${transferInfo.tipoContaFormatada} de número ${transferInfo.conta}.`,
+        bold: false,
+      });
+    } else if (transferInfo.agencia) {
+      tokensP2.push({
+        text: `, Agência número ${transferInfo.agencia}.`,
+        bold: false,
+      });
+    } else if (transferInfo.conta) {
+      tokensP2.push({
+        text: `, Conta ${transferInfo.tipoContaFormatada} de número ${transferInfo.conta}.`,
+        bold: false,
+      });
+    } else {
+      tokensP2.push({ text: '.', bold: false });
+    }
   } else if (isEspecie) {
     tokensP2 = [
       { text: 'Pagamento recebido ', bold: false },

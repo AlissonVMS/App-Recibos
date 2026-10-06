@@ -1522,6 +1522,7 @@ export function App() {
           setEditingPayment(null);
         }}
         onSave={handleSavePayment}
+        onDelete={handleDeletePayment}
         beneficiaries={beneficiaries}
         existingPayment={editingPayment}
         existingPayments={payments}
@@ -1567,12 +1568,13 @@ export function App() {
           <header className="bg-white border-b border-slate-200 text-slate-900 px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 z-20 shadow-2xs">
             <div className="flex items-center gap-3">
               <button
+                type="button"
                 onClick={() => setViewingReceiptPayment(null)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors text-xs font-semibold"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors text-xs font-semibold cursor-pointer"
                 title="Voltar ao Registro de Pagamentos (ou pressione ESC)"
               >
                 <ArrowRight className="w-4 h-4 rotate-180" />
-                <span className="hidden sm:inline">Voltar</span>
+                <span>Voltar</span>
                 <kbd className="hidden sm:inline-block ml-1 text-[10px] font-mono text-slate-500 bg-slate-100 border border-slate-300 rounded px-1.5 py-0.5">
                   ESC
                 </kbd>
@@ -1634,7 +1636,7 @@ export function App() {
                   }
                   imprimirElementoRecibo('receipt-print-area');
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg shadow-2xs transition-colors cursor-pointer"
                 title={
                   viewingReceiptPayment.status === 'PREVISTO'
                     ? 'Parcela prevista: clique para quitar e imprimir via oficial'
@@ -1642,7 +1644,7 @@ export function App() {
                 }
               >
                 <Printer className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Imprimir</span>
+                <span>Imprimir</span>
               </button>
 
               <button
