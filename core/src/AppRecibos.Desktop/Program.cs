@@ -54,35 +54,28 @@ public class Program
         }
 
         // 3. Determina a URL inicial da interface
-        string targetUrl = "http://localhost:3000";
-        var distDir = Path.Combine(AppContext.BaseDirectory, "interface", "dist");
-        var distIndex = Path.Combine(distDir, "index.html");
+        string targetUrl = "http://127.0.0.1:5000";
+        bool devRequested = args.Contains("--dev");
 
-        // Verifica se a porta 3000 do dev server está respondendo
-        bool devServerRunning = false;
-        try
+        if (devRequested)
         {
-            var res = httpClient.GetAsync("http://localhost:3000").GetAwaiter().GetResult();
-            devServerRunning = res.IsSuccessStatusCode;
-        }
-        catch
-        {
-            devServerRunning = false;
-        }
-
-        if (devServerRunning)
-        {
-            targetUrl = "http://localhost:3000";
-            Console.WriteLine($"[App-Recibos Desktop] Conectando ao Dev Server Vite em: {targetUrl}");
-        }
-        else if (File.Exists(distIndex))
-        {
-            targetUrl = $"file://{distIndex}";
-            Console.WriteLine($"[App-Recibos Desktop] Carregando interface compilada em: {targetUrl}");
+            try
+            {
+                var res = httpClient.GetAsync("http://localhost:3000").GetAwaiter().GetResult();
+                if (res.IsSuccessStatusCode)
+                {
+                    targetUrl = "http://localhost:3000";
+                    Console.WriteLine($"[App-Recibos Desktop] Modo Desenvolvimento: Conectando ao Vite em {targetUrl}");
+                }
+            }
+            catch
+            {
+                Console.WriteLine("[App-Recibos Desktop] Dev server não respondeu; usando backend local em http://127.0.0.1:5000");
+            }
         }
         else
         {
-            Console.WriteLine($"[App-Recibos Desktop] Dev Server não detectado; apontando para {targetUrl}");
+            Console.WriteLine($"[App-Recibos Desktop] Interface integrada ativa em: {targetUrl}");
         }
 
         // 4. Cria e exibe a janela nativa Photino

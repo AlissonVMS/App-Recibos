@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=App Recibos
+Comment=Gestão Financeira & Gerador de Recibos Civis em PDF
+Exec=/home/alisson/Documentos/_Projetos/App\ Recibos/abrir-app.sh
+Path=/home/alisson/Documentos/_Projetos/App Recibos
+Icon=/home/alisson/Documentos/_Projetos/App Recibos/core/src/AppRecibos.Desktop/app-icon.svg
+Terminal=false
+Categories=Office;Finance;
+StartupNotify=true
