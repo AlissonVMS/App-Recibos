@@ -66,6 +66,40 @@ var app = builder.Build();
 
 app.UseCors();
 
+// Suporte a arquivos estáticos do frontend (interface/dist ou wwwroot)
+string FindDistDirectory()
+{
+    var candidates = new[]
+    {
+        Path.Combine(AppContext.BaseDirectory, "wwwroot"),
+        Path.Combine(AppContext.BaseDirectory, "dist"),
+        Path.Combine(AppContext.BaseDirectory, "interface", "dist"),
+        Path.Combine(Directory.GetCurrentDirectory(), "interface", "dist")
+    };
+    foreach (var dir in candidates)
+    {
+        if (Directory.Exists(dir) && File.Exists(Path.Combine(dir, "index.html")))
+            return dir;
+    }
+    var current = new DirectoryInfo(AppContext.BaseDirectory);
+    while (current != null)
+    {
+        var test = Path.Combine(current.FullName, "interface", "dist");
+        if (Directory.Exists(test) && File.Exists(Path.Combine(test, "index.html")))
+            return test;
+        current = current.Parent;
+    }
+    return string.Empty;
+}
+
+var distDir = FindDistDirectory();
+if (!string.IsNullOrEmpty(distDir))
+{
+    var fileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(distDir);
+    app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = fileProvider });
+    app.UseStaticFiles(new StaticFileOptions { FileProvider = fileProvider });
+}
+
 // Inicialização e Seed do Banco de Dados
 var connectionFactory = app.Services.GetRequiredService<SqliteDbConnectionFactory>();
 connectionFactory.InitializeDatabase();
@@ -318,6 +352,12 @@ app.MapPost("/api/sync/excel", async (SyncService sync) =>
         pagamentos = res.Value.PagamentosImportados
     });
 });
+
+if (!string.IsNullOrEmpty(distDir))
+{
+    var fileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(distDir);
+    app.MapFallbackToFile("index.html", new StaticFileOptions { FileProvider = fileProvider });
+}
 
 app.Run();
 

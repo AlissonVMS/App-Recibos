@@ -22,6 +22,7 @@ core/**/bin/
 core/**/obj/
 core/**/.vs/
 core/**/TestResults/
+publish/
 *.user
 *.userosscache
 *.sln.docstates

@@ -100,6 +100,22 @@ dotnet run
 
 O servidor da API iniciará em **http://127.0.0.1:5000**. O Vite em `localhost:3000` redireciona automaticamente requisições `/api/*` para o backend.
 
+### Executando o Aplicativo Desktop Compilado (Janela Nativa)
+O aplicativo possui executável nativo compilado com janela leve (Photino / WebKitGTK) e backend C# integrado:
+
+```bash
+# Executar diretamente pelo script launcher:
+./abrir-app.sh
+
+# Ou pelo atalho na Área de Trabalho:
+# Clique duas vezes em "App Recibos" na sua Área de Trabalho
+```
+
+Também é possível iniciar diretamente no navegador padrão sem janela desktop:
+```bash
+./abrir-app.sh --browser
+```
+
 ### Executando a Suíte de Testes Automatizados
 Todos os testes de domínio, ClosedXML, QuestPDF e integração HTTP da API podem ser executados com:
 
