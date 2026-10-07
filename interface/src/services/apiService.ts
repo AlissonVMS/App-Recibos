@@ -62,7 +62,11 @@ export const apiService = {
     try {
       const res = await fetch(`${API_BASE}/pagamentos`);
       if (!res.ok) return null;
-      return await res.json();
+      const data = await res.json();
+      return data.map((p: any) => ({
+        ...p,
+        status: (p.status?.toString().toUpperCase() === 'PREVISTO' ? 'PREVISTO' : 'PAGO') as 'PAGO' | 'PREVISTO',
+      }));
     } catch {
       return null;
     }
@@ -91,6 +95,32 @@ export const apiService = {
       return await res.json();
     } catch {
       return null;
+    }
+  },
+
+  async quitarPagamentosLote(ids: string[], dataPagamento?: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/pagamentos/lote/quitar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, dataPagamento }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  async reverterPagamentosLote(ids: string[]): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/pagamentos/lote/reverter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ids),
+      });
+      return res.ok;
+    } catch {
+      return false;
     }
   },
 

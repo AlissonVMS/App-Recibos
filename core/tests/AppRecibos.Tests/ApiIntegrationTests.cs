@@ -95,4 +95,60 @@ public class ApiIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         var header = System.Text.Encoding.ASCII.GetString(zipBytes[..2]);
         header.Should().Be("PK");
     }
+
+    [Fact]
+    public async Task GetPagamentos_DeveRetornarStatusEmMaiusculas()
+    {
+        var response = await _client.GetAsync("/api/pagamentos");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var json = await response.Content.ReadAsStringAsync();
+        // Verifica que o JSON serializado contém "status":"PAGO" ou "status":"PREVISTO"
+        json.Should().Contain("\"status\":\"PAGO\"");
+    }
+
+    [Fact]
+    public async Task PostLoteQuitarELoteReverter_DeveProcessarComSucesso()
+    {
+        // Isola o arquivo Excel em cópia temporária para não alterar o arquivo raiz do repositório
+        var contratoRes = await _client.GetAsync("/api/contrato");
+        var contrato = await contratoRes.Content.ReadFromJsonAsync<ContratoConfig>();
+        string? originalExcel = contrato?.OnedriveExcelPath;
+        string? tempExcel = null;
+
+        if (contrato != null && !string.IsNullOrEmpty(originalExcel) && File.Exists(originalExcel))
+        {
+            tempExcel = Path.Combine(Path.GetTempPath(), $"test_batch_api_{Guid.NewGuid():N}.xlsx");
+            File.Copy(originalExcel, tempExcel, true);
+            contrato = contrato with { OnedriveExcelPath = tempExcel };
+            await _client.PutAsJsonAsync("/api/contrato", contrato);
+        }
+
+        try
+        {
+            var pagamentosRes = await _client.GetAsync("/api/pagamentos");
+            var pagamentos = await pagamentosRes.Content.ReadFromJsonAsync<List<Pagamento>>();
+            var ids = pagamentos!.Take(2).Select(p => p.Id).ToList();
+
+            // 1. Quitar lote
+            var quitarRes = await _client.PostAsJsonAsync("/api/pagamentos/lote/quitar", new { ids, dataPagamento = "2026-10-07" });
+            quitarRes.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            // 2. Reverter lote
+            var reverterRes = await _client.PostAsJsonAsync("/api/pagamentos/lote/reverter", ids);
+            reverterRes.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+        finally
+        {
+            if (contrato != null && !string.IsNullOrEmpty(originalExcel))
+            {
+                contrato = contrato with { OnedriveExcelPath = originalExcel };
+                await _client.PutAsJsonAsync("/api/contrato", contrato);
+            }
+            if (tempExcel != null && File.Exists(tempExcel))
+            {
+                try { File.Delete(tempExcel); } catch { }
+            }
+        }
+    }
 }

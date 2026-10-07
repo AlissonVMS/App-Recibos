@@ -116,6 +116,10 @@ public class SqliteDbConnectionFactory
                 mensagem TEXT,
                 registros_sincronizados INTEGER
             );
+
+            -- Normalização universal de status para maiúsculas (PAGO / PREVISTO)
+            UPDATE pagamentos SET status = 'PAGO' WHERE UPPER(status) = 'PAGO' AND status != 'PAGO';
+            UPDATE pagamentos SET status = 'PREVISTO' WHERE UPPER(status) = 'PREVISTO' AND status != 'PREVISTO';
         ";
         command.ExecuteNonQuery();
     }

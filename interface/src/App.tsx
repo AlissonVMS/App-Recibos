@@ -54,6 +54,9 @@ import {
   Info,
 } from 'lucide-react';
 
+export const isPago = (status?: string) => (status?.toString().toUpperCase() || 'PAGO') === 'PAGO';
+export const isPrevisto = (status?: string) => status?.toString().toUpperCase() === 'PREVISTO';
+
 export function App() {
   // Persistence via localStorage (v5 for Parcela 13 and scheduled parcels 14-18)
   const [contract, setContract] = useState<ContractConfig>(() => {
@@ -82,7 +85,11 @@ export function App() {
 
   const [payments, setPayments] = useState<PaymentRecord[]>(() => {
     const saved = localStorage.getItem('app_recibos_payments_v5');
-    return saved ? JSON.parse(saved) : INITIAL_PAYMENTS;
+    const raw: PaymentRecord[] = saved ? JSON.parse(saved) : INITIAL_PAYMENTS;
+    return raw.map((p) => ({
+      ...p,
+      status: (isPrevisto(p.status) ? 'PREVISTO' : 'PAGO') as 'PAGO' | 'PREVISTO',
+    }));
   });
 
   useEffect(() => {
@@ -168,14 +175,13 @@ export function App() {
   // Recalculate totals (considerando apenas parcelas PAGAS para o total realizado)
   const totalContrato = beneficiaries.reduce((acc, b) => acc + b.contrato, 0);
   const totalPago = payments
-    .filter((p) => (p.status || 'PAGO') === 'PAGO')
+    .filter((p) => isPago(p.status))
     .reduce((acc, p) => acc + p.valor, 0);
   const totalSaldo = Math.max(0, totalContrato - totalPago);
   const percentualRealizado = totalContrato > 0 ? (totalPago / totalContrato) * 100 : 0;
 
   // Filtered payments for table
   const filteredPayments = payments.filter((p) => {
-    const paymentStatus = p.status || 'PAGO';
     const matchesSearch =
       p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.cpf.includes(searchTerm) ||
@@ -185,7 +191,9 @@ export function App() {
       (p.dataPagamento && p.dataPagamento.includes(searchTerm));
 
     const matchesBen = filterBeneficiary === 'todos' || p.nome === filterBeneficiary;
-    const matchesStatus = filterStatus === 'todos' || paymentStatus === filterStatus;
+    const matchesStatus =
+      filterStatus === 'todos' ||
+      (filterStatus === 'PAGO' ? isPago(p.status) : isPrevisto(p.status));
 
     return matchesSearch && matchesBen && matchesStatus;
   });
@@ -232,31 +240,23 @@ export function App() {
   }, [confirmDialog.isOpen, viewingReceiptPayment]);
 
   // Filtra pagamentos filtrados que possuem status PAGO
-  const filteredPaidPayments = filteredPayments.filter(
-    (p) => (p.status || 'PAGO') === 'PAGO'
-  );
+  const filteredPaidPayments = filteredPayments.filter((p) => isPago(p.status));
 
   // Todos os pagamentos selecionados na tabela (PAGO e PREVISTO)
   const selectedTablePayments = payments.filter((p) => selectedTablePaymentIds.has(p.id));
 
   // Pagamentos selecionados que estão com status PAGO
-  const selectedPaidTablePayments = selectedTablePayments.filter(
-    (p) => (p.status || 'PAGO') === 'PAGO'
-  );
+  const selectedPaidTablePayments = selectedTablePayments.filter((p) => isPago(p.status));
 
   // Pagamentos selecionados que estão com status PREVISTO
-  const selectedPrevistoTablePayments = selectedTablePayments.filter(
-    (p) => p.status === 'PREVISTO'
-  );
+  const selectedPrevistoTablePayments = selectedTablePayments.filter((p) => isPrevisto(p.status));
 
   // Conjunto de pagamentos enviados para conferência e emissão:
   // Se houver seleção manual (via caixas), usa os selecionados. Caso contrário, usa os filtrados da tabela.
   const paymentsForEmission =
     selectedTablePayments.length > 0 ? selectedTablePayments : filteredPayments;
 
-  const paidPaymentsForEmission = paymentsForEmission.filter(
-    (p) => (p.status || 'PAGO') === 'PAGO'
-  );
+  const paidPaymentsForEmission = paymentsForEmission.filter((p) => isPago(p.status));
 
   // Abre a tela de conferência de recibos antes de gerar os arquivos
   const handleOpenReceiptsPreview = () => {
@@ -308,7 +308,7 @@ export function App() {
     setBeneficiaries((prev) =>
       prev.map((b) => {
         const benPaid = updatedPayments
-          .filter((p) => p.nome === b.nome && (p.status || 'PAGO') === 'PAGO')
+          .filter((p) => p.nome === b.nome && isPago(p.status))
           .reduce((acc, p) => acc + p.valor, 0);
         const newSaldo = Math.max(0, b.contrato - benPaid);
         return {
@@ -369,7 +369,7 @@ export function App() {
     setBeneficiaries((prev) =>
       prev.map((b) => {
         const benPaid = updatedPayments
-          .filter((p) => p.nome === b.nome && (p.status || 'PAGO') === 'PAGO')
+          .filter((p) => p.nome === b.nome && isPago(p.status))
           .reduce((acc, p) => acc + p.valor, 0);
         const newSaldo = Math.max(0, b.contrato - benPaid);
         return {
@@ -408,8 +408,8 @@ export function App() {
   };
 
   // Executa: Marcar selecionadas como pagas em lote
-  const executeBatchMarkAsPaid = () => {
-    if (selectedTablePaymentIds.size === 0) return;
+  const executeBatchMarkAsPaid = async () => {
+    if (selectedPrevistoTablePayments.length === 0) return;
     const today = new Date();
     const dia = String(today.getDate()).padStart(2, '0');
     const MESES = [
@@ -419,9 +419,10 @@ export function App() {
     const mes = MESES[today.getMonth()];
     const ano = String(today.getFullYear());
     const dataFormatada = `${ano}-${String(today.getMonth() + 1).padStart(2, '0')}-${dia}`;
+    const targetIds = selectedPrevistoTablePayments.map((p) => p.id);
 
     const updatedPayments = payments.map((p) => {
-      if (selectedTablePaymentIds.has(p.id)) {
+      if (targetIds.includes(p.id)) {
         return {
           ...p,
           status: 'PAGO' as const,
@@ -437,21 +438,31 @@ export function App() {
 
     setPayments(updatedPayments);
 
-    // Recalcula saldos dos cedentes
-    setBeneficiaries((prev) =>
-      prev.map((b) => {
-        const benPaid = updatedPayments
-          .filter((p) => p.nome === b.nome && (p.status || 'PAGO') === 'PAGO')
-          .reduce((acc, p) => acc + p.valor, 0);
-        const newSaldo = Math.max(0, b.contrato - benPaid);
-        return {
-          ...b,
-          pago: benPaid,
-          saldo: newSaldo,
-          status: newSaldo === 0 ? 'QUITADO' : 'EM ABERTO',
-        };
-      })
-    );
+    if (isBackendConnected) {
+      await apiService.quitarPagamentosLote(targetIds, dataFormatada);
+      const [b, p] = await Promise.all([
+        apiService.getBeneficiarios(),
+        apiService.getPagamentos(),
+      ]);
+      if (b && b.length > 0) setBeneficiaries(b);
+      if (p && p.length > 0) setPayments(p);
+    } else {
+      // Recalcula saldos dos cedentes localmente
+      setBeneficiaries((prev) =>
+        prev.map((b) => {
+          const benPaid = updatedPayments
+            .filter((p) => p.nome === b.nome && isPago(p.status))
+            .reduce((acc, p) => acc + p.valor, 0);
+          const newSaldo = Math.max(0, b.contrato - benPaid);
+          return {
+            ...b,
+            pago: benPaid,
+            saldo: newSaldo,
+            status: newSaldo === 0 ? 'QUITADO' : 'EM ABERTO',
+          };
+        })
+      );
+    }
   };
 
   // Solicita confirmação antes de marcar em lote (Sênior UX & Financeiro)
@@ -478,11 +489,12 @@ export function App() {
   };
 
   // Executa: Reverter selecionadas para previsto em lote
-  const executeBatchRevertToPrevisto = () => {
-    if (selectedTablePaymentIds.size === 0) return;
+  const executeBatchRevertToPrevisto = async () => {
+    if (selectedPaidTablePayments.length === 0) return;
+    const targetIds = selectedPaidTablePayments.map((p) => p.id);
 
     const updatedPayments = payments.map((p) => {
-      if (selectedTablePaymentIds.has(p.id)) {
+      if (targetIds.includes(p.id)) {
         return {
           ...p,
           status: 'PREVISTO' as const,
@@ -494,21 +506,31 @@ export function App() {
 
     setPayments(updatedPayments);
 
-    // Recalcula saldos dos cedentes
-    setBeneficiaries((prev) =>
-      prev.map((b) => {
-        const benPaid = updatedPayments
-          .filter((p) => p.nome === b.nome && (p.status || 'PAGO') === 'PAGO')
-          .reduce((acc, p) => acc + p.valor, 0);
-        const newSaldo = Math.max(0, b.contrato - benPaid);
-        return {
-          ...b,
-          pago: benPaid,
-          saldo: newSaldo,
-          status: newSaldo === 0 ? 'QUITADO' : 'EM ABERTO',
-        };
-      })
-    );
+    if (isBackendConnected) {
+      await apiService.reverterPagamentosLote(targetIds);
+      const [b, p] = await Promise.all([
+        apiService.getBeneficiarios(),
+        apiService.getPagamentos(),
+      ]);
+      if (b && b.length > 0) setBeneficiaries(b);
+      if (p && p.length > 0) setPayments(p);
+    } else {
+      // Recalcula saldos dos cedentes localmente
+      setBeneficiaries((prev) =>
+        prev.map((b) => {
+          const benPaid = updatedPayments
+            .filter((p) => p.nome === b.nome && isPago(p.status))
+            .reduce((acc, p) => acc + p.valor, 0);
+          const newSaldo = Math.max(0, b.contrato - benPaid);
+          return {
+            ...b,
+            pago: benPaid,
+            saldo: newSaldo,
+            status: newSaldo === 0 ? 'QUITADO' : 'EM ABERTO',
+          };
+        })
+      );
+    }
   };
 
   // Solicita confirmação antes de reverter em lote (Sênior UX & Financeiro)
@@ -548,7 +570,7 @@ export function App() {
 
     // Update beneficiary totals (considera apenas pagamentos com status PAGO)
     const benPaidPayments = updatedPayments.filter(
-      (p) => p.nome === payment.nome && (p.status || 'PAGO') === 'PAGO'
+      (p) => p.nome === payment.nome && isPago(p.status)
     );
     const sumPaid = benPaidPayments.reduce((acc, p) => acc + p.valor, 0);
 
@@ -594,7 +616,7 @@ export function App() {
 
     // Update beneficiary totals (considera apenas pagamentos com status PAGO)
     const benPaidPayments = remaining.filter(
-      (p) => p.nome === target.nome && (p.status || 'PAGO') === 'PAGO'
+      (p) => p.nome === target.nome && isPago(p.status)
     );
     const sumPaid = benPaidPayments.reduce((acc, p) => acc + p.valor, 0);
 
@@ -857,10 +879,10 @@ export function App() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {beneficiaries.map((b) => {
                 const benPaidPayments = payments.filter(
-                  (p) => p.nome === b.nome && (p.status || 'PAGO') === 'PAGO'
+                  (p) => p.nome === b.nome && isPago(p.status)
                 );
                 const benPlannedPayments = payments.filter(
-                  (p) => p.nome === b.nome && p.status === 'PREVISTO'
+                  (p) => p.nome === b.nome && isPrevisto(p.status)
                 );
                 const benTotalPago = benPaidPayments.reduce((acc, p) => acc + p.valor, 0);
                 const benSaldoDevedor = Math.max(0, b.contrato - benTotalPago);
@@ -1126,8 +1148,8 @@ export function App() {
                   className="text-xs rounded-lg border border-slate-200 bg-slate-50 py-2 px-2.5 focus:bg-white focus:border-blue-500 focus:outline-hidden font-semibold"
                 >
                   <option value="todos">Status: Todos</option>
-                  <option value="PAGO">Somente Pagos ({payments.filter(p => (p.status || 'PAGO') === 'PAGO').length})</option>
-                  <option value="PREVISTO">Somente Previstos ({payments.filter(p => p.status === 'PREVISTO').length})</option>
+                  <option value="PAGO">Somente Pagos ({payments.filter(p => isPago(p.status)).length})</option>
+                  <option value="PREVISTO">Somente Previstos ({payments.filter(p => isPrevisto(p.status)).length})</option>
                 </select>
               </div>
             </div>
@@ -1217,14 +1239,27 @@ export function App() {
                     type="button"
                     onClick={() => {
                       const allPaidIds = payments
-                        .filter((p) => (p.status || 'PAGO') === 'PAGO')
+                        .filter((p) => isPago(p.status))
                         .map((p) => p.id);
                       setSelectedTablePaymentIds(new Set(allPaidIds));
                     }}
                     className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md border border-blue-200 transition-colors whitespace-nowrap"
                     title="Selecionar apenas as parcelas com status PAGO"
                   >
-                    Somente Pagos ({payments.filter((p) => (p.status || 'PAGO') === 'PAGO').length})
+                    Somente Pagos ({payments.filter((p) => isPago(p.status)).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allPrevistoIds = payments
+                        .filter((p) => isPrevisto(p.status))
+                        .map((p) => p.id);
+                      setSelectedTablePaymentIds(new Set(allPrevistoIds));
+                    }}
+                    className="px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md border border-amber-200 transition-colors whitespace-nowrap"
+                    title="Selecionar apenas as parcelas com status PREVISTO"
+                  >
+                    Somente Previstos ({payments.filter((p) => isPrevisto(p.status)).length})
                   </button>
                   {selectedTablePaymentIds.size > 0 && (
                     <button
@@ -1304,7 +1339,7 @@ export function App() {
                       </tr>
                     ) : (
                       filteredPayments.map((p) => {
-                        const isPrevisto = p.status === 'PREVISTO';
+                        const rowIsPrevisto = isPrevisto(p.status);
                         const isSelected = selectedTablePaymentIds.has(p.id);
 
                         // Data prevista formatada
@@ -1315,7 +1350,7 @@ export function App() {
                         // Data pagamento formatada
                         const pgtoFormatada = p.dataPagamento
                           ? `${p.dataPagamento.split('-')[2]}/${p.dataPagamento.split('-')[1]}/${p.dataPagamento.split('-')[0]}`
-                          : p.data && !isPrevisto
+                          : p.data && !rowIsPrevisto
                           ? `${p.data.split('-')[2]}/${p.data.split('-')[1]}/${p.data.split('-')[0]}`
                           : null;
 
@@ -1353,7 +1388,7 @@ export function App() {
                                 }}
                                 className="rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                                 title={
-                                  isPrevisto
+                                  rowIsPrevisto
                                     ? 'Parcela com status PREVISTO (não gera recibo civil)'
                                     : isSelected
                                     ? 'Desmarcar parcela'
@@ -1371,7 +1406,7 @@ export function App() {
                               </span>
                             </td>
                             <td className="py-2.5 px-2 text-center whitespace-nowrap">
-                              {isPrevisto ? (
+                              {rowIsPrevisto ? (
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -1407,7 +1442,7 @@ export function App() {
                               </span>
                             </td>
                             <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                              {isPrevisto ? (
+                              {rowIsPrevisto ? (
                                 <span className="text-slate-400 font-mono text-xs italic">-</span>
                               ) : (
                                 <span className="font-mono font-semibold text-emerald-800 text-xs bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70">
@@ -1434,7 +1469,7 @@ export function App() {
                             <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1.5">
                                 {/* Alternador de Status individual */}
-                                {isPrevisto ? (
+                                {rowIsPrevisto ? (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1511,9 +1546,16 @@ export function App() {
                 <span>
                   Exibindo <strong className="text-slate-800">{filteredPayments.length}</strong> de {payments.length} registros
                 </span>
-                <span className="font-mono text-slate-700">
-                  Total Pago Exibido: <strong className="text-slate-900 font-bold ml-1 font-mono">{formatarMoeda(filteredPayments.reduce((s, p) => s + p.valor, 0))}</strong>
-                </span>
+                <div className="flex items-center gap-3 font-mono text-slate-700">
+                  <span>
+                    Total Pago: <strong className="text-emerald-700 font-bold ml-1 font-mono">{formatarMoeda(filteredPayments.filter(p => isPago(p.status)).reduce((s, p) => s + p.valor, 0))}</strong>
+                  </span>
+                  {filteredPayments.some(p => isPrevisto(p.status)) && (
+                    <span>
+                      • Total Previsto: <strong className="text-amber-700 font-bold ml-1 font-mono">{formatarMoeda(filteredPayments.filter(p => isPrevisto(p.status)).reduce((s, p) => s + p.valor, 0))}</strong>
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1677,8 +1719,12 @@ export function App() {
                     <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
                       Parcela nº {viewingReceiptPayment.parcela}
                     </span>
-                    <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                      {viewingReceiptPayment.status || 'PAGO'}
+                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                      isPago(viewingReceiptPayment.status)
+                        ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                        : 'text-amber-700 bg-amber-50 border border-amber-200'
+                    }`}>
+                      {isPago(viewingReceiptPayment.status) ? 'PAGO' : 'PREVISTO'}
                     </span>
                   </h3>
                   <p className="text-[11px] text-slate-500 font-mono hidden sm:block">
@@ -1692,7 +1738,7 @@ export function App() {
               <button
                 type="button"
                 onClick={() => {
-                  if (viewingReceiptPayment.status === 'PREVISTO') {
+                  if (isPrevisto(viewingReceiptPayment.status)) {
                     setConfirmDialog({
                       isOpen: true,
                       title: 'Parcela com Status PREVISTO',
@@ -1723,7 +1769,7 @@ export function App() {
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg shadow-2xs transition-colors cursor-pointer"
                 title={
-                  viewingReceiptPayment.status === 'PREVISTO'
+                  isPrevisto(viewingReceiptPayment.status)
                     ? 'Parcela prevista: clique para quitar e imprimir via oficial'
                     : 'Imprimir via oficial do recibo'
                 }
@@ -1735,7 +1781,7 @@ export function App() {
               <button
                 type="button"
                 onClick={() => {
-                  if (viewingReceiptPayment.status === 'PREVISTO') {
+                  if (isPrevisto(viewingReceiptPayment.status)) {
                     setConfirmDialog({
                       isOpen: true,
                       title: 'Parcela com Status PREVISTO',
@@ -1765,7 +1811,7 @@ export function App() {
                 }}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-all cursor-pointer"
                 title={
-                  viewingReceiptPayment.status === 'PREVISTO'
+                  isPrevisto(viewingReceiptPayment.status)
                     ? 'Parcela prevista: clique para quitar e baixar PDF'
                     : `Baixar PDF: ${gerarNomeArquivoRecibo(viewingReceiptPayment)}`
                 }
@@ -1777,7 +1823,7 @@ export function App() {
           </header>
 
           {/* AVISO INFORMATIVO LOGO ABAIXO DA BARRA (Não colado na folha A4) */}
-          {viewingReceiptPayment.status === 'PREVISTO' && (
+          {isPrevisto(viewingReceiptPayment.status) && (
             <div className="bg-blue-50/95 border-b border-blue-200 px-4 sm:px-6 py-2.5 text-blue-900 text-xs flex items-center justify-between gap-3 shrink-0 shadow-2xs">
               <div className="flex items-center gap-2">
                 <Info className="w-4 h-4 text-blue-600 shrink-0" />
@@ -1794,7 +1840,7 @@ export function App() {
                 payment={viewingReceiptPayment}
                 contract={contract}
                 onPrint={
-                  viewingReceiptPayment.status === 'PREVISTO'
+                  isPrevisto(viewingReceiptPayment.status)
                     ? undefined
                     : () => imprimirElementoRecibo('receipt-print-area')
                 }

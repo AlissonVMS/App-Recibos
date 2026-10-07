@@ -58,7 +58,7 @@ export function gerarNomeArquivoRecibo(
  * - Parcelas mistas na mesma data: "RECIBOS P11, 13 E 15 11-07-2026.zip"
  */
 export function gerarNomeArquivoLote(pagamentos: PaymentRecord[]): string {
-  const pagos = pagamentos.filter((p) => (p.status || 'PAGO') === 'PAGO');
+  const pagos = pagamentos.filter((p) => (p.status?.toString().toUpperCase() || 'PAGO') === 'PAGO');
   if (pagos.length === 0) return 'RECIBOS.zip';
 
   // 1. Parcelas únicas ordenadas
@@ -805,7 +805,7 @@ export async function baixarPdfRecibosZip(
   contrato: ContractConfig,
   nomeZip: string = 'RECIBOS_INDIVIDUAIS.zip'
 ): Promise<void> {
-  const pagos = pagamentos.filter((p) => (p.status || 'PAGO') === 'PAGO');
+  const pagos = pagamentos.filter((p) => (p.status?.toString().toUpperCase() || 'PAGO') === 'PAGO');
   if (pagos.length === 0) return;
 
   const nomeFinalZip = nomeZip.endsWith('.zip') ? nomeZip : `${nomeZip}.zip`;
@@ -876,7 +876,7 @@ export async function emitirRecibos(
   contrato: ContractConfig,
   nomeLote?: string
 ): Promise<void> {
-  const pagos = pagamentos.filter((p) => (p.status || 'PAGO') === 'PAGO');
+  const pagos = pagamentos.filter((p) => (p.status?.toString().toUpperCase() || 'PAGO') === 'PAGO');
   if (pagos.length === 0) return;
 
   if (pagos.length === 1) {

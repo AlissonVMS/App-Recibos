@@ -194,7 +194,7 @@ export function imprimirLoteRecibos(
   pagamentos: PaymentRecord[],
   contrato: ContractConfig
 ): void {
-  const pagos = pagamentos.filter((p) => (p.status || 'PAGO') === 'PAGO');
+  const pagos = pagamentos.filter((p) => (p.status?.toString().toUpperCase() || 'PAGO') === 'PAGO');
   if (pagos.length === 0) return;
 
   const iframe = document.createElement('iframe');

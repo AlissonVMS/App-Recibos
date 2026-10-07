@@ -5,7 +5,9 @@ namespace AppRecibos.Core.Domain.Enums;
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum StatusParcela
 {
+    [JsonStringEnumMemberName("PREVISTO")]
     Previsto,
+    [JsonStringEnumMemberName("PAGO")]
     Pago
 }
 

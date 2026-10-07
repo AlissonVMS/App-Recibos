@@ -52,4 +52,20 @@ public class SyncService
 
         return await _excelEngine.AtualizarParcelaNaPlanilhaAsync(excelPath, pag);
     }
+
+    public async Task<Result> SincronizarParcelasComPlanilhaAsync(string excelPath, IEnumerable<string> pagamentoIds)
+    {
+        var pagamentos = new List<Pagamento>();
+        foreach (var id in pagamentoIds)
+        {
+            var pag = await _pagamentoRepo.GetByIdAsync(id);
+            if (pag != null)
+                pagamentos.Add(pag);
+        }
+
+        if (!pagamentos.Any())
+            return Result.Success();
+
+        return await _excelEngine.AtualizarParcelasNaPlanilhaAsync(excelPath, pagamentos);
+    }
 }

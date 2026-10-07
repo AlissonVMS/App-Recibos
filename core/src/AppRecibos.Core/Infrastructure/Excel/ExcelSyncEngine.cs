@@ -249,8 +249,17 @@ public class ExcelSyncEngine
 
     public async Task<Result> AtualizarParcelaNaPlanilhaAsync(string filePath, Pagamento pagamento)
     {
+        return await AtualizarParcelasNaPlanilhaAsync(filePath, new[] { pagamento });
+    }
+
+    public async Task<Result> AtualizarParcelasNaPlanilhaAsync(string filePath, IEnumerable<Pagamento> pagamentos)
+    {
         if (!File.Exists(filePath))
             return Result.Failure($"Arquivo '{filePath}' não encontrado.");
+
+        var pagamentosList = pagamentos.ToList();
+        if (!pagamentosList.Any())
+            return Result.Success();
 
         try
         {
@@ -269,8 +278,9 @@ public class ExcelSyncEngine
             var tabela = ws.Table("PARCELAS");
             var pCols = GetColumnMap(tabela);
 
-            IXLRangeRow? targetRow = null;
             var parcelaCounters = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var rowMap = new Dictionary<string, IXLRangeRow>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var row in tabela.DataRange.Rows())
             {
                 var rowNome = GetStringValue(row.Cell(pCols["NOME"]));
@@ -283,44 +293,44 @@ public class ExcelSyncEngine
                     rowParcela = parcelaCounters[rowNome];
                 }
 
-                if (string.Equals(rowNome, pagamento.BeneficiarioNome, StringComparison.OrdinalIgnoreCase) &&
-                    rowParcela == pagamento.ParcelaNumero)
+                var key = $"{rowNome}_{rowParcela}";
+                rowMap[key] = row;
+            }
+
+            foreach (var pagamento in pagamentosList)
+            {
+                var key = $"{pagamento.BeneficiarioNome}_{pagamento.ParcelaNumero}";
+                if (!rowMap.TryGetValue(key, out var targetRow))
+                    continue;
+
+                // Atualiza STATUS (PAGO / PREVISTO em maiúsculas)
+                targetRow.Cell(pCols["STATUS"]).SetValue(pagamento.Status == StatusParcela.Pago ? "PAGO" : "PREVISTO");
+
+                // Atualiza VALOR
+                if (pagamento.Valor > 0)
+                    targetRow.Cell(pCols["VALOR"]).SetValue((double)pagamento.Valor);
+
+                // Atualiza DATA PAGAMENTO
+                if (pagamento.Status == StatusParcela.Pago && !string.IsNullOrWhiteSpace(pagamento.DataPagamento))
                 {
-                    targetRow = row;
-                    break;
+                    if (DateTime.TryParseExact(pagamento.DataPagamento, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                        targetRow.Cell(pCols["DATA PAGAMENTO"]).SetValue(dt);
                 }
+                else
+                {
+                    targetRow.Cell(pCols["DATA PAGAMENTO"]).Clear();
+                }
+
+                // Atualiza DATA PREVISTA
+                if (!string.IsNullOrWhiteSpace(pagamento.DataPrevista))
+                {
+                    if (DateTime.TryParseExact(pagamento.DataPrevista, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                        targetRow.Cell(pCols["DATA PREVISTA"]).SetValue(dt);
+                }
+
+                if (!string.IsNullOrWhiteSpace(pagamento.FormaPgto))
+                    targetRow.Cell(pCols["FORMA PGTO"]).SetValue(pagamento.FormaPgto);
             }
-
-            if (targetRow == null)
-                return Result.Failure($"Parcela nº {pagamento.ParcelaNumero} de '{pagamento.BeneficiarioNome}' não encontrada na planilha.");
-
-            // Atualiza STATUS
-            targetRow.Cell(pCols["STATUS"]).SetValue(pagamento.Status == StatusParcela.Pago ? "PAGO" : "PREVISTO");
-
-            // Atualiza VALOR
-            if (pagamento.Valor > 0)
-                targetRow.Cell(pCols["VALOR"]).SetValue((double)pagamento.Valor);
-
-            // Atualiza DATA PAGAMENTO
-            if (pagamento.Status == StatusParcela.Pago && !string.IsNullOrWhiteSpace(pagamento.DataPagamento))
-            {
-                if (DateTime.TryParseExact(pagamento.DataPagamento, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
-                    targetRow.Cell(pCols["DATA PAGAMENTO"]).SetValue(dt);
-            }
-            else
-            {
-                targetRow.Cell(pCols["DATA PAGAMENTO"]).Clear();
-            }
-
-            // Atualiza DATA PREVISTA
-            if (!string.IsNullOrWhiteSpace(pagamento.DataPrevista))
-            {
-                if (DateTime.TryParseExact(pagamento.DataPrevista, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
-                    targetRow.Cell(pCols["DATA PREVISTA"]).SetValue(dt);
-            }
-
-            if (!string.IsNullOrWhiteSpace(pagamento.FormaPgto))
-                targetRow.Cell(pCols["FORMA PGTO"]).SetValue(pagamento.FormaPgto);
 
             // Salvar para buffer de memória
             using var outMs = new MemoryStream();
@@ -347,7 +357,7 @@ public class ExcelSyncEngine
         }
         catch (Exception ex)
         {
-            return Result.Failure($"Erro ao atualizar parcela na planilha: {ex.Message}");
+            return Result.Failure($"Erro ao atualizar parcelas na planilha: {ex.Message}");
         }
     }
 
