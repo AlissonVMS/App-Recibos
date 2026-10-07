@@ -7,12 +7,30 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Node / Frontend (interface/)
 node_modules
+interface/node_modules
 dist
 dist-ssr
+interface/dist
 *.local
+package-lock.json
+interface/package-lock.json
 
-# Editor directories and files
+# .NET / Backend (core/)
+core/**/bin/
+core/**/obj/
+core/**/.vs/
+core/**/TestResults/
+*.user
+*.userosscache
+*.sln.docstates
+
+# VitePress Documentation (docs/)
+docs/.vitepress/dist
+docs/.vitepress/cache
+
+# Editor & OS files
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -22,7 +40,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-package-lock.json
+
+# Backups & Local safety
+.backups/
 
 # Environment and temporary files
 .env
