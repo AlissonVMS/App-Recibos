@@ -21,6 +21,7 @@ import {
   gerarNomeArquivoRecibo,
 } from './utils/pdfGenerator';
 import { imprimirElementoRecibo } from './utils/printHelper';
+import { apiService } from './services/apiService';
 import {
   FileText,
   DollarSign,
@@ -95,6 +96,56 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('app_recibos_payments_v5', JSON.stringify(payments));
   }, [payments]);
+
+  // Backend C# .NET 9 Status & Sync State
+  const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  useEffect(() => {
+    async function initBackend() {
+      const isOnline = await apiService.checkHealth();
+      setIsBackendConnected(isOnline);
+      if (isOnline) {
+        try {
+          const [c, b, p] = await Promise.all([
+            apiService.getContrato(),
+            apiService.getBeneficiarios(),
+            apiService.getPagamentos(),
+          ]);
+          if (c) setContract(c);
+          if (b && b.length > 0) setBeneficiaries(b);
+          if (p && p.length > 0) setPayments(p);
+        } catch (err) {
+          console.warn('Erro ao carregar dados do backend C#:', err);
+        }
+      }
+    }
+    initBackend();
+  }, []);
+
+  const handleSyncExcel = async () => {
+    if (!isBackendConnected) {
+      alert('Backend C# .NET 9 não detectado. Inicie o backend com ./run-dev.sh ou dotnet run em core/src/AppRecibos.Api.');
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      const res = await apiService.syncExcel();
+      if (res.success) {
+        const [b, p] = await Promise.all([
+          apiService.getBeneficiarios(),
+          apiService.getPagamentos(),
+        ]);
+        if (b && b.length > 0) setBeneficiaries(b);
+        if (p && p.length > 0) setPayments(p);
+        alert(res.message || 'Sincronização com Excel concluída com sucesso!');
+      } else {
+        alert('Erro ao sincronizar com Excel: ' + res.message);
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'geral' | 'tabela' | 'contrato' | 'exportar'>('geral');
@@ -249,6 +300,10 @@ export function App() {
 
     setPayments(updatedPayments);
 
+    if (isBackendConnected) {
+      apiService.quitarPagamento(paymentId, dataFormatada);
+    }
+
     // Recalcula saldos dos cedentes
     setBeneficiaries((prev) =>
       prev.map((b) => {
@@ -305,6 +360,10 @@ export function App() {
     });
 
     setPayments(updatedPayments);
+
+    if (isBackendConnected) {
+      apiService.reverterPagamento(paymentId);
+    }
 
     // Recalcula saldos dos cedentes
     setBeneficiaries((prev) =>
@@ -519,6 +578,10 @@ export function App() {
     const remaining = payments.filter((p) => p.id !== id);
     setPayments(remaining);
 
+    if (isBackendConnected) {
+      apiService.excluirPagamento(id);
+    }
+
     // Remove da seleção se estiver marcado
     setSelectedTablePaymentIds((prev) => {
       if (prev.has(id)) {
@@ -578,6 +641,9 @@ export function App() {
 
   // Handler: Save Beneficiary (mantém contrato e valores financeiros protegidos)
   const handleSaveBeneficiary = (updated: Beneficiary) => {
+    if (isBackendConnected) {
+      apiService.updateBeneficiario(updated.id, updated);
+    }
     setBeneficiaries((prev) =>
       prev.map((b) => {
         if (b.id === updated.id) {
@@ -684,12 +750,31 @@ export function App() {
 
             {/* Top Right Quick Actions */}
             <div className="flex items-center gap-2 sm:gap-3">
+              {isBackendConnected && (
+                <button
+                  onClick={handleSyncExcel}
+                  disabled={isSyncing}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-300 bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-500/30 rounded-lg transition-colors cursor-pointer"
+                  title="Sincronizar dados com a planilha CONTROLE PAGAMENTOS.xlsx"
+                >
+                  <FileSpreadsheet className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Excel'}</span>
+                </button>
+              )}
+
+              <div className="hidden md:flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border bg-slate-900/60 border-slate-700/60">
+                <span className={`w-2 h-2 rounded-full ${isBackendConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span className="text-slate-300 font-medium">
+                  {isBackendConnected ? 'Backend .NET 9 Ativo' : 'Modo Offline Local'}
+                </span>
+              </div>
+
               <button
                 onClick={() => {
                   setEditingPayment(null);
                   setIsPaymentModalOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-xs cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">Novo Pagamento</span>
