@@ -766,12 +766,34 @@ export function baixarPdfRecibosConsolidados(
   doc.save(nomeArquivo);
 }
 
-export function baixarPdfRecibo(
+export async function baixarPdfRecibo(
   pagamento: PaymentRecord,
   contrato: ContractConfig
-): void {
-  const doc = criarDocumentoPdfRecibo(pagamento, contrato);
+): Promise<void> {
   const nomeArquivo = gerarNomeArquivoRecibo(pagamento);
+
+  // Tenta baixar o PDF oficial gerado nativamente pelo QuestPDF em memória C#
+  try {
+    const res = await fetch(`/api/recibos/${pagamento.id}/pdf`, {
+      signal: AbortSignal.timeout(2500),
+    });
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nomeArquivo;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return;
+    }
+  } catch {
+    // Fallback automático para o gerador client-side jsPDF
+  }
+
+  const doc = criarDocumentoPdfRecibo(pagamento, contrato);
   doc.save(nomeArquivo);
 }
 
@@ -785,6 +807,32 @@ export async function baixarPdfRecibosZip(
 ): Promise<void> {
   const pagos = pagamentos.filter((p) => (p.status || 'PAGO') === 'PAGO');
   if (pagos.length === 0) return;
+
+  const nomeFinalZip = nomeZip.endsWith('.zip') ? nomeZip : `${nomeZip}.zip`;
+
+  // Tenta gerar pacote ZIP em lote no backend via QuestPDF
+  try {
+    const res = await fetch('/api/recibos/lote-zip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentIds: pagos.map((p) => p.id) }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nomeFinalZip;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return;
+    }
+  } catch {
+    // Fallback automático para JSZip no navegador
+  }
 
   const zip = new JSZip();
   const nomesUsados = new Map<string, number>();
@@ -811,7 +859,7 @@ export async function baixarPdfRecibosZip(
   const url = URL.createObjectURL(zipBlob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = nomeZip.endsWith('.zip') ? nomeZip : `${nomeZip}.zip`;
+  link.download = nomeFinalZip;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
