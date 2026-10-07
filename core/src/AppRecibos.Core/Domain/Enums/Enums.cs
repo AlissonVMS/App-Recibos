@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace AppRecibos.Core.Domain.Enums;
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum StatusParcela
 {
     Previsto,
