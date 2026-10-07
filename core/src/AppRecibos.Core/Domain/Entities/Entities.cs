@@ -20,8 +20,11 @@ public sealed record Beneficiario
     public required string Nome { get; init; }
     public required string Cpf { get; init; }
     public decimal ContratoTotal { get; init; }
+    public decimal Contrato => ContratoTotal;
     public decimal TotalPago { get; init; }
+    public decimal Pago => TotalPago;
     public decimal SaldoDevedor { get; init; }
+    public decimal Saldo => SaldoDevedor;
     public required string Status { get; init; } = "EM ABERTO"; // EM ABERTO | QUITADO
     public required string Banco { get; init; }
     public string? Agencia { get; init; }
@@ -38,17 +41,23 @@ public sealed record Pagamento
     public required string Id { get; init; }
     public required string BeneficiarioId { get; init; }
     public required string BeneficiarioNome { get; init; }
+    public string Nome => BeneficiarioNome;
     public required string BeneficiarioCpf { get; init; }
+    public string Cpf => BeneficiarioCpf;
     public int ParcelaNumero { get; init; }
+    public int Parcela => ParcelaNumero;
     public decimal Valor { get; init; }
     public StatusParcela Status { get; init; } // Previsto | Pago
     public string? DataPrevista { get; init; }
     public string? DataPagamento { get; init; }
+    public string Data => DataPagamento ?? DataPrevista ?? string.Empty;
     public required string FormaPgto { get; init; } // PIX | TEV
     public required string ChavePix { get; init; }
+    public string Chave => ChavePix;
     public string? TipoChavePix { get; init; }
     public required string Banco { get; init; }
     public decimal SaldoAposParcela { get; init; }
+    public decimal Saldo => SaldoAposParcela;
     public string? Dia { get; init; }
     public string? Mes { get; init; }
     public string? Ano { get; init; }
