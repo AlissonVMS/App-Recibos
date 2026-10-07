@@ -195,20 +195,29 @@ app.MapGet("/api/pagamentos/{id}", async (string id, PagamentoRepository repo) =
     return pag != null ? Results.Ok(pag) : Results.NotFound();
 });
 
+// Função auxiliar para obter o caminho ativo da planilha do contrato (com fallback para excelPath)
+async Task<string> ObterCaminhoPlanilhaAsync(ContratoRepository repo)
+{
+    var c = await repo.GetAsync();
+    return !string.IsNullOrEmpty(c?.OnedriveExcelPath) ? c.OnedriveExcelPath : excelPath;
+}
+
 app.MapPost("/api/pagamentos/{id}/quitar", async (
     string id,
     [FromBody] QuitarRequest? req,
     PaymentService paymentService,
     SyncService sync,
-    PagamentoRepository repo) =>
+    PagamentoRepository repo,
+    ContratoRepository contratoRepo) =>
 {
     var result = await paymentService.QuitarParcelaAsync(id, req?.DataPagamento);
     if (!result.IsSuccess)
         return Results.BadRequest(new { error = result.Error });
 
-    if (File.Exists(excelPath))
+    var caminhoExcel = await ObterCaminhoPlanilhaAsync(contratoRepo);
+    if (File.Exists(caminhoExcel))
     {
-        await sync.SincronizarParcelaComPlanilhaAsync(excelPath, id);
+        await sync.SincronizarParcelaComPlanilhaAsync(caminhoExcel, id);
     }
 
     var atualizado = await repo.GetByIdAsync(id);
@@ -220,19 +229,67 @@ app.MapPost("/api/pagamentos/{id}/reverter", async (
     string id,
     PaymentService paymentService,
     SyncService sync,
-    PagamentoRepository repo) =>
+    PagamentoRepository repo,
+    ContratoRepository contratoRepo) =>
 {
     var result = await paymentService.ReverterParcelaAsync(id);
     if (!result.IsSuccess)
         return Results.BadRequest(new { error = result.Error });
 
-    if (File.Exists(excelPath))
+    var caminhoExcel = await ObterCaminhoPlanilhaAsync(contratoRepo);
+    if (File.Exists(caminhoExcel))
     {
-        await sync.SincronizarParcelaComPlanilhaAsync(excelPath, id);
+        await sync.SincronizarParcelaComPlanilhaAsync(caminhoExcel, id);
     }
 
     var atualizado = await repo.GetByIdAsync(id);
     return Results.Ok(atualizado);
+});
+
+// Quitar Parcelas em Lote
+app.MapPost("/api/pagamentos/lote/quitar", async (
+    [FromBody] QuitarLoteRequest req,
+    PaymentService paymentService,
+    SyncService sync,
+    ContratoRepository contratoRepo) =>
+{
+    if (req?.Ids == null || req.Ids.Count == 0)
+        return Results.BadRequest(new { error = "Nenhum ID de parcela fornecido." });
+
+    var result = await paymentService.QuitarParcelasLoteAsync(req.Ids, req.DataPagamento);
+    if (!result.IsSuccess)
+        return Results.BadRequest(new { error = result.Error });
+
+    var caminhoExcel = await ObterCaminhoPlanilhaAsync(contratoRepo);
+    if (File.Exists(caminhoExcel))
+    {
+        await sync.SincronizarParcelasComPlanilhaAsync(caminhoExcel, req.Ids);
+    }
+
+    return Results.Ok(new { success = true, count = req.Ids.Count });
+});
+
+// Reverter Parcelas em Lote
+app.MapPost("/api/pagamentos/lote/reverter", async (
+    [FromBody] List<string> ids,
+    PaymentService paymentService,
+    SyncService sync,
+    ContratoRepository contratoRepo) =>
+{
+    if (ids == null || ids.Count == 0)
+        return Results.BadRequest(new { error = "Nenhum ID de parcela fornecido." });
+
+    var result = await paymentService.ReverterParcelasLoteAsync(ids);
+    if (!result.IsSuccess)
+        return Results.BadRequest(new { error = result.Error });
+
+    var caminhoExcel = await ObterCaminhoPlanilhaAsync(contratoRepo);
+    if (File.Exists(caminhoExcel))
+    {
+        await sync.SincronizarParcelasComPlanilhaAsync(caminhoExcel, ids);
+    }
+
+    return Results.Ok(new { success = true, count = ids.Count });
 });
 
 // Criar nova parcela
@@ -336,12 +393,13 @@ app.MapPost("/api/recibos/lote-zip", async (
 });
 
 // Sincronização com Excel
-app.MapPost("/api/sync/excel", async (SyncService sync) =>
+app.MapPost("/api/sync/excel", async (SyncService sync, ContratoRepository contratoRepo) =>
 {
-    if (!File.Exists(excelPath))
-        return Results.NotFound(new { error = $"Arquivo Excel não encontrado em '{excelPath}'." });
+    var caminhoExcel = await ObterCaminhoPlanilhaAsync(contratoRepo);
+    if (!File.Exists(caminhoExcel))
+        return Results.NotFound(new { error = $"Arquivo Excel não encontrado em '{caminhoExcel}'." });
 
-    var res = await sync.ImportarPlanilhaParaBancoAsync(excelPath);
+    var res = await sync.ImportarPlanilhaParaBancoAsync(caminhoExcel);
     if (!res.IsSuccess)
         return Results.BadRequest(new { error = res.Error });
 
@@ -362,6 +420,7 @@ if (!string.IsNullOrEmpty(distDir))
 app.Run();
 
 record QuitarRequest(string? DataPagamento);
+record QuitarLoteRequest(List<string> Ids, string? DataPagamento);
 record LoteZipRequest(List<string> PaymentIds);
 
 public partial class Program { }

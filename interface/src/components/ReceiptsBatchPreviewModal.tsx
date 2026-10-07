@@ -39,11 +39,11 @@ export const ReceiptsBatchPreviewModal: React.FC<ReceiptsBatchPreviewModalProps>
   // Filtro interno e implícito na regra de negócio:
   // Apenas pagamentos com status PAGO geram recibo oficial
   const paidPayments = useMemo(() => {
-    return selectedPayments.filter((p) => (p.status || 'PAGO') === 'PAGO');
+    return selectedPayments.filter((p) => (p.status?.toString().toUpperCase() || 'PAGO') === 'PAGO');
   }, [selectedPayments]);
 
   const plannedPayments = useMemo(() => {
-    return selectedPayments.filter((p) => p.status === 'PREVISTO');
+    return selectedPayments.filter((p) => p.status?.toString().toUpperCase() === 'PREVISTO');
   }, [selectedPayments]);
 
   const [currentIndex, setCurrentIndex] = useState<number>(0);

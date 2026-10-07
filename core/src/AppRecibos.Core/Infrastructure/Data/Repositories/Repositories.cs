@@ -264,7 +264,7 @@ public class PagamentoRepository
             p.BeneficiarioCpf,
             p.ParcelaNumero,
             p.Valor,
-            StatusStr = p.Status.ToString(),
+            StatusStr = p.Status == StatusParcela.Pago ? "PAGO" : "PREVISTO",
             p.DataPrevista,
             p.DataPagamento,
             p.FormaPgto,

@@ -22,7 +22,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
 
   // Calcula estritamente pelos status PAGO e PREVISTO
   const paymentsList = payments || [];
-  const paidPayments = paymentsList.filter((p) => (p.status || 'PAGO') === 'PAGO');
+  const paidPayments = paymentsList.filter((p) => (p.status?.toString().toUpperCase() || 'PAGO') === 'PAGO');
 
   const totalRealizado = payments
     ? paidPayments.reduce((acc, p) => acc + p.valor, 0)
