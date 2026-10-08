@@ -57,6 +57,34 @@ import {
 export const isPago = (status?: string) => (status?.toString().toUpperCase() || 'PAGO') === 'PAGO';
 export const isPrevisto = (status?: string) => status?.toString().toUpperCase() === 'PREVISTO';
 
+export const formatarDataParcela = (p?: PaymentRecord | null): string => {
+  if (!p) return '-';
+  if (p.dia && p.mes && p.ano) {
+    const mesCurto = p.mes.length > 3 ? p.mes.slice(0, 3) : p.mes;
+    return `${p.dia} ${mesCurto} ${p.ano}`;
+  }
+  const dateStr = p.dataPagamento || p.dataPrevista || p.data;
+  if (dateStr && dateStr.includes('-')) {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return p.data || '-';
+};
+
+export const formatarMesDiaCurto = (p?: PaymentRecord | null): string => {
+  if (!p) return '-';
+  if (p.dia && p.mes) {
+    const mesCurto = p.mes.length > 3 ? p.mes.slice(0, 3) : p.mes;
+    return `${p.dia}/${mesCurto}`;
+  }
+  const dateStr = p.dataPrevista || p.dataPagamento || p.data;
+  if (dateStr && dateStr.includes('-')) {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+  }
+  return '-';
+};
+
 export function App() {
   // Persistence via localStorage (v5 for Parcela 13 and scheduled parcels 14-18)
   const [contract, setContract] = useState<ContractConfig>(() => {
@@ -971,7 +999,7 @@ export function App() {
                             </span>
                             <span className="text-xs font-bold text-slate-800">
                               {lastPayment
-                                ? `${lastPayment.dia} ${lastPayment.mes.slice(0, 3)} ${lastPayment.ano} (nº ${lastPayment.parcela})`
+                                ? `${formatarDataParcela(lastPayment)} (nº ${lastPayment.parcela})`
                                 : 'Nenhum pagamento'}
                             </span>
                           </div>
@@ -989,7 +1017,7 @@ export function App() {
                       {nextPlanned && (
                         <div className="mt-2 p-2.5 rounded-lg bg-blue-50/60 border border-blue-200/60 flex items-center justify-between text-[11px]">
                           <span className="text-blue-700 font-medium">
-                            Próxima Prevista: <strong>nº {nextPlanned.parcela}</strong> ({nextPlanned.dia}/{nextPlanned.mes.slice(0, 3)})
+                            Próxima Prevista: <strong>nº {nextPlanned.parcela}</strong> ({formatarMesDiaCurto(nextPlanned)})
                           </span>
                           <span className="font-bold font-mono text-blue-900">
                             {formatarMoeda(nextPlanned.valor)}
@@ -1343,14 +1371,16 @@ export function App() {
                         const isSelected = selectedTablePaymentIds.has(p.id);
 
                         // Data prevista formatada
-                        const previsaoFormatada = p.dataPrevista
+                        const previsaoFormatada = p.dataPrevista && p.dataPrevista.includes('-')
                           ? `${p.dataPrevista.split('-')[2]}/${p.dataPrevista.split('-')[1]}/${p.dataPrevista.split('-')[0]}`
-                          : `${p.dia.padStart(2, '0')}/${p.mes.slice(0, 3)}/${p.ano}`;
+                          : p.dia && p.mes && p.ano
+                          ? `${p.dia.padStart(2, '0')}/${p.mes.slice(0, 3)}/${p.ano}`
+                          : (p.data || '-');
 
                         // Data pagamento formatada
-                        const pgtoFormatada = p.dataPagamento
+                        const pgtoFormatada = p.dataPagamento && p.dataPagamento.includes('-')
                           ? `${p.dataPagamento.split('-')[2]}/${p.dataPagamento.split('-')[1]}/${p.dataPagamento.split('-')[0]}`
-                          : p.data && !rowIsPrevisto
+                          : p.data && !rowIsPrevisto && p.data.includes('-')
                           ? `${p.data.split('-')[2]}/${p.data.split('-')[1]}/${p.data.split('-')[0]}`
                           : null;
 
@@ -1446,7 +1476,7 @@ export function App() {
                                 <span className="text-slate-400 font-mono text-xs italic">-</span>
                               ) : (
                                 <span className="font-mono font-semibold text-emerald-800 text-xs bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70">
-                                  {pgtoFormatada || `${p.dia}/${p.mes.slice(0, 3)}`}
+                                  {pgtoFormatada || formatarMesDiaCurto(p)}
                                 </span>
                               )}
                             </td>

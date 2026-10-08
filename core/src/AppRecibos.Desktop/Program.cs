@@ -88,6 +88,9 @@ public class Program
                 .SetMinSize(900, 600)
                 .Center()
                 .SetResizable(true)
+                .SetContextMenuEnabled(false)
+                .SetDevToolsEnabled(false)
+                .SetGrantBrowserPermissions(true)
                 .Load(targetUrl);
 
             window.WaitForClose();

@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* Estilos de experiência para Aplicativo Desktop Nativo */
+:root {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input, textarea, [contenteditable="true"], .select-text, table td, table th {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 @media print {
   @page {
     size: A4 portrait;

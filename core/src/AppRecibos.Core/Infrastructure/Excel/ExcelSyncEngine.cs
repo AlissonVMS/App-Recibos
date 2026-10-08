@@ -205,12 +205,16 @@ public class ExcelSyncEngine
                 var mes = GetStringValue(row.Cell(pCols["MÊS"]));
                 var ano = GetStringValue(row.Cell(pCols["ANO"]));
 
-                if (!string.IsNullOrWhiteSpace(dataPagamento) && DateTime.TryParse(dataPagamento, out var dtVal))
+                var dataReferencia = !string.IsNullOrWhiteSpace(dataPagamento) ? dataPagamento : dataPrevista;
+                if (!string.IsNullOrWhiteSpace(dataReferencia) && DateTime.TryParse(dataReferencia, out var dtVal))
                 {
                     if (string.IsNullOrWhiteSpace(dia))
                         dia = dtVal.Day.ToString("00");
                     if (string.IsNullOrWhiteSpace(mes))
-                        mes = dtVal.ToString("MMMM", new CultureInfo("pt-BR"));
+                    {
+                        var mesNome = dtVal.ToString("MMMM", new CultureInfo("pt-BR"));
+                        mes = char.ToUpper(mesNome[0]) + mesNome[1..];
+                    }
                     if (string.IsNullOrWhiteSpace(ano))
                         ano = dtVal.Year.ToString();
                 }
