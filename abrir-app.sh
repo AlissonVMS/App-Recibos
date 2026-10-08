@@ -21,15 +21,32 @@ if [ -n "$DOTNET_ROOT" ]; then
     export PATH="$DOTNET_ROOT:$PATH"
 fi
 
-# Verifica se o binário compilado existe; caso não, compila automaticamente
-if [ ! -f "publish/AppRecibos.Desktop" ]; then
-    echo "[App-Recibos] Publicação inicial não encontrada. Compilando..."
+rebuild_app() {
+    echo "[App-Recibos] Atualizando e compilando frontend e backend..."
+    if [ -d "interface" ]; then
+        (cd interface && npm run build)
+    fi
     dotnet publish core/src/AppRecibos.Desktop/AppRecibos.Desktop.csproj -c Release -o publish/
     mkdir -p publish/wwwroot publish/interface/dist
     if [ -d "interface/dist" ]; then
         cp -r interface/dist/* publish/wwwroot/
         cp -r interface/dist/* publish/interface/dist/
     fi
+    if [ -f "CONTROLE PAGAMENTOS.xlsx" ]; then
+        cp -f "CONTROLE PAGAMENTOS.xlsx" publish/
+    fi
+    echo "[App-Recibos] Publicação concluída com sucesso em publish/."
+}
+
+# Se solicitado apenas atualizar/recompilar
+if [ "$1" == "--build" ] || [ "$1" == "--update" ] || [ "$1" == "--rebuild" ]; then
+    rebuild_app
+    exit 0
+fi
+
+# Verifica se o binário compilado existe; caso não, compila automaticamente
+if [ ! -f "publish/AppRecibos.Desktop" ]; then
+    rebuild_app
 fi
 
 # Se foi solicitado modo apenas navegador via argumento

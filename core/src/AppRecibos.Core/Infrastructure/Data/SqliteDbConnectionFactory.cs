@@ -141,7 +141,7 @@ public class SqliteDbConnectionFactory
                     WHEN '12' THEN 'Dezembro'
                     ELSE mes
                 END
-            WHERE (dia IS NULL OR mes IS NULL OR ano IS NULL)
+            WHERE (dia IS NULL OR mes IS NULL OR ano IS NULL OR TRIM(dia) = '' OR TRIM(mes) = '' OR TRIM(ano) = '')
               AND (data_pagamento IS NOT NULL OR data_prevista IS NOT NULL);
         ";
         command.ExecuteNonQuery();
