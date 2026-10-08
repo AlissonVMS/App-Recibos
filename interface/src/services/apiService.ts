@@ -2,6 +2,39 @@ import { Beneficiary, ContractConfig, PaymentRecord } from '../types';
 
 const API_BASE = '/api';
 
+export const MESES_PT = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+];
+
+export function normalizarPagamento(p: any): PaymentRecord {
+  const dataRef = p.dataPagamento || p.dataPrevista || p.data || '';
+  let dia = p.dia;
+  let mes = p.mes;
+  let ano = p.ano;
+
+  if ((!dia || !mes || !ano) && dataRef && dataRef.includes('-')) {
+    const parts = dataRef.split('-');
+    if (parts.length === 3) {
+      ano = ano || parts[0];
+      const mesNum = parseInt(parts[1], 10);
+      if (!mes && mesNum >= 1 && mesNum <= 12) {
+        mes = MESES_PT[mesNum - 1];
+      }
+      dia = dia || parts[2].padStart(2, '0');
+    }
+  }
+
+  return {
+    ...p,
+    status: (p.status?.toString().toUpperCase() === 'PREVISTO' ? 'PREVISTO' : 'PAGO') as 'PAGO' | 'PREVISTO',
+    dia: dia || '',
+    mes: mes || '',
+    ano: ano || '',
+    data: p.data || dataRef,
+  };
+}
+
 export const apiService = {
   async checkHealth(): Promise<boolean> {
     try {
@@ -63,10 +96,7 @@ export const apiService = {
       const res = await fetch(`${API_BASE}/pagamentos`);
       if (!res.ok) return null;
       const data = await res.json();
-      return data.map((p: any) => ({
-        ...p,
-        status: (p.status?.toString().toUpperCase() === 'PREVISTO' ? 'PREVISTO' : 'PAGO') as 'PAGO' | 'PREVISTO',
-      }));
+      return data.map((p: any) => normalizarPagamento(p));
     } catch {
       return null;
     }
@@ -80,7 +110,7 @@ export const apiService = {
         body: JSON.stringify({ dataPagamento }),
       });
       if (!res.ok) return null;
-      return await res.json();
+      return normalizarPagamento(await res.json());
     } catch {
       return null;
     }
@@ -92,7 +122,7 @@ export const apiService = {
         method: 'POST',
       });
       if (!res.ok) return null;
-      return await res.json();
+      return normalizarPagamento(await res.json());
     } catch {
       return null;
     }

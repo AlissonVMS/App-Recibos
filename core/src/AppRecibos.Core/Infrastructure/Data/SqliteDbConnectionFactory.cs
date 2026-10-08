@@ -120,6 +120,29 @@ public class SqliteDbConnectionFactory
             -- Normalização universal de status para maiúsculas (PAGO / PREVISTO)
             UPDATE pagamentos SET status = 'PAGO' WHERE UPPER(status) = 'PAGO' AND status != 'PAGO';
             UPDATE pagamentos SET status = 'PREVISTO' WHERE UPPER(status) = 'PREVISTO' AND status != 'PREVISTO';
+
+            -- Normalização de dia, mês e ano caso estejam nulos e haja data disponível
+            UPDATE pagamentos
+            SET
+                ano = SUBSTR(COALESCE(data_pagamento, data_prevista), 1, 4),
+                dia = SUBSTR(COALESCE(data_pagamento, data_prevista), 9, 2),
+                mes = CASE SUBSTR(COALESCE(data_pagamento, data_prevista), 6, 2)
+                    WHEN '01' THEN 'Janeiro'
+                    WHEN '02' THEN 'Fevereiro'
+                    WHEN '03' THEN 'Março'
+                    WHEN '04' THEN 'Abril'
+                    WHEN '05' THEN 'Maio'
+                    WHEN '06' THEN 'Junho'
+                    WHEN '07' THEN 'Julho'
+                    WHEN '08' THEN 'Agosto'
+                    WHEN '09' THEN 'Setembro'
+                    WHEN '10' THEN 'Outubro'
+                    WHEN '11' THEN 'Novembro'
+                    WHEN '12' THEN 'Dezembro'
+                    ELSE mes
+                END
+            WHERE (dia IS NULL OR mes IS NULL OR ano IS NULL)
+              AND (data_pagamento IS NOT NULL OR data_prevista IS NOT NULL);
         ";
         command.ExecuteNonQuery();
     }
