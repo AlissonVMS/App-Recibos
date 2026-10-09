@@ -7,7 +7,8 @@
   user-select: none;
 }
 
-input, textarea, [contenteditable="true"], .select-text, table td, table th {
+/* Apenas campos editáveis e elementos com .select-text permitem seleção de texto em app desktop */
+input, textarea, [contenteditable="true"], .select-text {
   -webkit-user-select: text;
   user-select: text;
 }
