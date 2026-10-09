@@ -852,19 +852,11 @@ export function App() {
       if (isBackendConnected) {
         const res = await fetch('/api/export/csv');
         if (res.ok) {
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `CONTROLE_PAGAMENTOS_${new Date().toISOString().slice(0, 10)}.csv`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-          showToast('success', 'Exportação Concluída', 'Planilha CSV exportada com sucesso.');
+          showToast('success', 'Exportação Concluída', 'A planilha foi salva diretamente na sua pasta Downloads!');
           return;
         }
       }
+
 
       // Fallback local robusto gerando Blob binário UTF-8 com BOM
       const headers = [

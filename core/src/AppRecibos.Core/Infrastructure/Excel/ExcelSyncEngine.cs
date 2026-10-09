@@ -524,11 +524,19 @@ public class ExcelSyncEngine
                 pagoPorBen[g.Key] = acumuladoPago;
             }
 
+            var xmlSettings = new System.Xml.XmlWriterSettings 
+            { 
+                OmitXmlDeclaration = false, 
+                Encoding = new System.Text.UTF8Encoding(false), 
+                Indent = false 
+            };
+
             sheet2Entry.Delete();
             var newSheet2Entry = archive.CreateEntry("xl/worksheets/sheet2.xml", CompressionLevel.Optimal);
             using (var outS2 = newSheet2Entry.Open())
+            using (var writer = System.Xml.XmlWriter.Create(outS2, xmlSettings))
             {
-                sheet2Doc.Save(outS2);
+                sheet2Doc.Save(writer);
             }
 
             // 3. Atualizar sheet1.xml (Controle Geral)
@@ -647,8 +655,9 @@ public class ExcelSyncEngine
                     sheet1Entry.Delete();
                     var newSheet1Entry = archive.CreateEntry("xl/worksheets/sheet1.xml", CompressionLevel.Optimal);
                     using (var outS1 = newSheet1Entry.Open())
+                    using (var writer = System.Xml.XmlWriter.Create(outS1, xmlSettings))
                     {
-                        sheet1Doc.Save(outS1);
+                        sheet1Doc.Save(writer);
                     }
 
                     // 4. Atualizar chart1.xml
@@ -696,8 +705,9 @@ public class ExcelSyncEngine
                         chartEntry.Delete();
                         var newChartEntry = archive.CreateEntry("xl/charts/chart1.xml", CompressionLevel.Optimal);
                         using (var outCh = newChartEntry.Open())
+                        using (var writer = System.Xml.XmlWriter.Create(outCh, xmlSettings))
                         {
-                            chartDoc.Save(outCh);
+                            chartDoc.Save(writer);
                         }
                     }
                 }
