@@ -460,18 +460,7 @@ app.MapGet("/api/export/csv", async (PagamentoRepository pagRepo, BeneficiarioRe
     Buffer.BlockCopy(preamble, 0, fullBytes, 0, preamble.Length);
     Buffer.BlockCopy(contentBytes, 0, fullBytes, preamble.Length, contentBytes.Length);
 
-    var downloadsPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-    if (!System.IO.Directory.Exists(downloadsPath))
-    {
-        System.IO.Directory.CreateDirectory(downloadsPath);
-    }
-    
-    var fileName = $"CONTROLE_PAGAMENTOS_{DateTime.Now:yyyy-MM-dd}.csv";
-    var filePath = System.IO.Path.Combine(downloadsPath, fileName);
-    
-    await System.IO.File.WriteAllBytesAsync(filePath, fullBytes);
-
-    return Results.Ok(new { message = $"Salvo com sucesso em {filePath}", path = filePath });
+    return Results.File(fullBytes, "text/csv");
 });
 
 app.Run();

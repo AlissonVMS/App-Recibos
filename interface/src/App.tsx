@@ -141,6 +141,22 @@ export function App() {
       e.preventDefault();
     };
     document.addEventListener('contextmenu', handleContextMenu);
+    
+    // @ts-ignore
+    if (window.external && window.external.receiveMessage) {
+      // @ts-ignore
+      window.external.receiveMessage((msg) => {
+        try {
+          const parsed = JSON.parse(msg);
+          if (parsed.type === 'save-success') {
+            showToast('success', 'Salvo com sucesso!', `Arquivo salvo em:\n${parsed.path}`);
+          } else if (parsed.type === 'save-error') {
+            showToast('error', 'Erro ao Salvar', parsed.message || 'Houve um erro ao tentar salvar o arquivo.');
+          }
+        } catch (e) {}
+      });
+    }
+
     return () => document.removeEventListener('contextmenu', handleContextMenu);
   }, []);
 
@@ -363,6 +379,30 @@ export function App() {
     confirmVariant: 'emerald',
     onConfirm: () => {},
   });
+
+  const requestConfirm = (options: {
+    title: string;
+    message: string;
+    subMessage?: string;
+    details?: { label: string; value: string }[];
+    confirmLabel: string;
+    confirmVariant: 'emerald' | 'amber' | 'red';
+    onConfirm: () => void;
+  }) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: options.title,
+      message: options.message,
+      subMessage: options.subMessage,
+      details: options.details,
+      confirmLabel: options.confirmLabel,
+      confirmVariant: options.confirmVariant,
+      onConfirm: () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        options.onConfirm();
+      },
+    });
+  };
 
   // Tecla ESC para fechar modal de confirmação ou visualização do recibo
   useEffect(() => {
@@ -833,26 +873,31 @@ export function App() {
 
   // Reset to original Excel data
   const handleResetData = () => {
-    if (
-      window.confirm(
-        'Tem certeza que deseja restaurar os dados originais da planilha "CONTROLE PAGAMENTOS.xlsx"?'
-      )
-    ) {
-      setBeneficiaries(INITIAL_BENEFICIARIES);
-      setPayments(INITIAL_PAYMENTS);
-      setContract(INITIAL_CONTRACT_CONFIG);
-      localStorage.clear();
-      setSelectedReceiptPaymentId(INITIAL_PAYMENTS[0]?.id || '');
-    }
+    requestConfirm({
+      title: 'Restaurar Dados Originais',
+      message: 'Tem certeza que deseja restaurar os dados originais da planilha "CONTROLE PAGAMENTOS.xlsx"?',
+      subMessage: 'Esta ação apagará as modificações locais que não foram sincronizadas com o Excel e voltará aos dados da planilha.',
+      confirmLabel: 'Sim, Restaurar Dados',
+      confirmVariant: 'amber',
+      onConfirm: () => {
+        setBeneficiaries(INITIAL_BENEFICIARIES);
+        setPayments(INITIAL_PAYMENTS);
+        setContract(INITIAL_CONTRACT_CONFIG);
+        localStorage.clear();
+        setSelectedReceiptPaymentId(INITIAL_PAYMENTS[0]?.id || '');
+        showToast('info', 'Dados Restaurados', 'Os dados originais foram carregados da planilha.');
+      }
+    });
   };
 
   // Export CSV
   const handleExportCsv = async () => {
     try {
       if (isBackendConnected) {
-        const res = await fetch('/api/export/csv');
-        if (res.ok) {
-          showToast('success', 'Exportação Concluída', 'A planilha foi salva diretamente na sua pasta Downloads!');
+        // @ts-ignore
+        if (window.external && window.external.sendMessage) {
+          // @ts-ignore
+          window.external.sendMessage("request-save-csv");
           return;
         }
       }
@@ -1923,6 +1968,8 @@ export function App() {
           <ContractManagementTab
             contract={contract}
             beneficiaries={beneficiaries}
+            showToast={showToast}
+            requestConfirm={requestConfirm}
             onSave={(updatedContract, updatedBeneficiaries) => {
               setContract(updatedContract);
               setBeneficiaries(
@@ -1973,6 +2020,8 @@ export function App() {
         onClose={() => setIsContractModalOpen(false)}
         contract={contract}
         beneficiaries={beneficiaries}
+        showToast={showToast}
+        requestConfirm={requestConfirm}
         onSave={(updatedContract, updatedBeneficiaries) => {
           setContract(updatedContract);
           setBeneficiaries(
