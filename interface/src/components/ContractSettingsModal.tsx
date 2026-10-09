@@ -31,6 +31,8 @@ interface ContractSettingsModalProps {
     updatedContract: ContractConfig,
     updatedBeneficiaries: Beneficiary[]
   ) => void;
+  showToast?: (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => void;
+  requestConfirm?: (options: { title: string; message: string; subMessage?: string; confirmLabel: string; confirmVariant: 'emerald' | 'red' | 'amber'; onConfirm: () => void }) => void;
 }
 
 export const ContractSettingsModal: React.FC<ContractSettingsModalProps> = ({
@@ -39,6 +41,8 @@ export const ContractSettingsModal: React.FC<ContractSettingsModalProps> = ({
   contract,
   beneficiaries,
   onSave,
+  showToast,
+  requestConfirm,
 }) => {
   if (!isOpen) return null;
 
@@ -117,19 +121,30 @@ export const ContractSettingsModal: React.FC<ContractSettingsModalProps> = ({
 
   const handleRemoveParty = (id: string, name: string) => {
     if (parties.length <= 1) {
-      alert('O contrato deve possuir pelo menos uma parte cadastrada.');
+      if (showToast) showToast('warning', 'Ação Bloqueada', 'O contrato deve possuir pelo menos uma parte cadastrada.');
+      else alert('O contrato deve possuir pelo menos uma parte cadastrada.');
       return;
     }
-    const confirmDelete = window.confirm(
-      `Deseja realmente remover a parte "${name || 'Sem Nome'}" do contrato?`
-    );
-    if (confirmDelete) {
+    const executeDelete = () => {
       setParties((prev) => prev.filter((p) => p.id !== id));
       setExpandedIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
+    };
+
+    if (requestConfirm) {
+      requestConfirm({
+        title: 'Remover Parte do Contrato',
+        message: `Deseja realmente remover a parte "${name || 'Sem Nome'}" do contrato?`,
+        confirmLabel: 'Sim, Remover',
+        confirmVariant: 'red',
+        onConfirm: executeDelete,
+      });
+    } else {
+      const confirmDelete = window.confirm(`Deseja realmente remover a parte "${name || 'Sem Nome'}" do contrato?`);
+      if (confirmDelete) executeDelete();
     }
   };
 
@@ -139,13 +154,15 @@ export const ContractSettingsModal: React.FC<ContractSettingsModalProps> = ({
     // Validações básicas das partes
     for (const p of parties) {
       if (!p.nome.trim()) {
-        alert('Por favor, informe o nome de todas as partes do contrato.');
+        if (showToast) showToast('warning', 'Campos Incompletos', 'Por favor, informe o nome de todas as partes do contrato.');
+        else alert('Por favor, informe o nome de todas as partes do contrato.');
         setActiveTab('partes');
         setExpandedIds((prev) => new Set(prev).add(p.id));
         return;
       }
       if (!p.cpf.trim()) {
-        alert(`Por favor, informe o CPF da parte "${p.nome}".`);
+        if (showToast) showToast('warning', 'Campos Incompletos', `Por favor, informe o CPF da parte "${p.nome}".`);
+        else alert(`Por favor, informe o CPF da parte "${p.nome}".`);
         setActiveTab('partes');
         setExpandedIds((prev) => new Set(prev).add(p.id));
         return;

@@ -80,6 +80,8 @@ public class Program
 
         // 4. Cria e exibe a janela nativa Photino
         Console.WriteLine("[App-Recibos Desktop] Abrindo janela nativa leve Photino...");
+        string lastSaveDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        
         try
         {
             var window = new PhotinoWindow()
@@ -90,9 +92,40 @@ public class Program
                 .SetResizable(true)
                 .SetContextMenuEnabled(false)
                 .SetDevToolsEnabled(false)
-                .SetGrantBrowserPermissions(true)
-                .Load(targetUrl);
+                .SetGrantBrowserPermissions(true);
 
+            window.RegisterWebMessageReceivedHandler((sender, message) =>
+            {
+                if (message == "request-save-csv")
+                {
+                    Task.Run(async () => 
+                    {
+                        var w = (PhotinoWindow)sender;
+                        var defaultFileName = $"CONTROLE_PAGAMENTOS_{DateTime.Now:yyyy-MM-dd}.csv";
+                        var defaultPath = Path.Combine(lastSaveDir, defaultFileName);
+                        var path = w.ShowSaveFile("Salvar Planilha de Pagamentos CSV", defaultPath, new (string, string[])[] { ("CSV", new[] { "csv" }) });
+                        
+                        if (!string.IsNullOrWhiteSpace(path))
+                        {
+                            var dir = Path.GetDirectoryName(path);
+                            if (!string.IsNullOrWhiteSpace(dir)) lastSaveDir = dir;
+
+                            try
+                            {
+                                var csvBytes = await httpClient.GetByteArrayAsync($"{targetUrl}/api/export/csv");
+                                File.WriteAllBytes(path, csvBytes);
+                                w.SendWebMessage("{\"type\":\"save-success\",\"path\":\"" + path.Replace("\\", "\\\\") + "\"}");
+                            }
+                            catch (Exception ex)
+                            {
+                                w.SendWebMessage("{\"type\":\"save-error\",\"message\":\"" + ex.Message.Replace("\"", "'") + "\"}");
+                            }
+                        }
+                    });
+                }
+            });
+
+            window.Load(targetUrl);
             window.WaitForClose();
         }
         catch (Exception ex)
