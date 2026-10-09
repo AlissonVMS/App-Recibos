@@ -52,7 +52,11 @@ import {
   Archive,
   Printer,
   Info,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react';
+import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 
 export const isPago = (status?: string) => (status?.toString().toUpperCase() || 'PAGO') === 'PAGO';
 export const isPrevisto = (status?: string) => status?.toString().toUpperCase() === 'PREVISTO';
@@ -132,6 +136,14 @@ export function App() {
     localStorage.setItem('app_recibos_payments_v5', JSON.stringify(payments));
   }, [payments]);
 
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    document.addEventListener('contextmenu', handleContextMenu);
+    return () => document.removeEventListener('contextmenu', handleContextMenu);
+  }, []);
+
   // Backend C# .NET 9 Status & Sync State
   const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -158,9 +170,25 @@ export function App() {
     initBackend();
   }, []);
 
+  // Sistema de Notificações Toast Moderno
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const showToast = (type: ToastType, title: string, message: string, duration = 4000) => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    setToasts((prev) => [...prev, { id, type, title, message, duration }]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
   const handleSyncExcel = async () => {
     if (!isBackendConnected) {
-      alert('Backend C# .NET 9 não detectado. Inicie o backend com ./run-dev.sh ou dotnet run em core/src/AppRecibos.Api.');
+      showToast(
+        'warning',
+        'Backend Não Detectado',
+        'Operando em modo local. Inicie o backend com ./abrir-app.sh para sincronização bidirecional.'
+      );
       return;
     }
     setIsSyncing(true);
@@ -173,9 +201,17 @@ export function App() {
         ]);
         if (b && b.length > 0) setBeneficiaries(b);
         if (p && p.length > 0) setPayments(p);
-        alert(res.message || 'Sincronização com Excel concluída com sucesso!');
+        showToast(
+          'success',
+          'Sincronização com Excel',
+          res.message || 'Dados sincronizados com a planilha Excel com sucesso.'
+        );
       } else {
-        alert('Erro ao sincronizar com Excel: ' + res.message);
+        showToast(
+          'error',
+          'Falha na Sincronização',
+          res.message || 'Não foi possível sincronizar os dados com a planilha Excel.'
+        );
       }
     } finally {
       setIsSyncing(false);
@@ -225,6 +261,84 @@ export function App() {
 
     return matchesSearch && matchesBen && matchesStatus;
   });
+
+  // Ordenação de colunas da tabela de pagamentos
+  type SortField =
+    | 'beneficiario'
+    | 'parcela'
+    | 'status'
+    | 'previsao'
+    | 'dataPgto'
+    | 'valor'
+    | 'saldo'
+    | 'forma';
+  type SortDirection = 'asc' | 'desc';
+
+  const [sortField, setSortField] = useState<SortField>('parcela');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedFilteredPayments = React.useMemo(() => {
+    return [...filteredPayments].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'beneficiario':
+          comparison = a.nome.localeCompare(b.nome, 'pt-BR');
+          break;
+        case 'parcela':
+          comparison = a.parcela - b.parcela;
+          break;
+        case 'status': {
+          const statusA = isPago(a.status) ? 'PAGO' : 'PREVISTO';
+          const statusB = isPago(b.status) ? 'PAGO' : 'PREVISTO';
+          comparison = statusA.localeCompare(statusB);
+          break;
+        }
+        case 'previsao': {
+          const dateA = a.dataPrevista || a.data || '';
+          const dateB = b.dataPrevista || b.data || '';
+          comparison = dateA.localeCompare(dateB);
+          break;
+        }
+        case 'dataPgto': {
+          const dateA = a.dataPagamento || '';
+          const dateB = b.dataPagamento || '';
+          comparison = dateA.localeCompare(dateB);
+          break;
+        }
+        case 'valor':
+          comparison = a.valor - b.valor;
+          break;
+        case 'saldo':
+          comparison = a.saldo - b.saldo;
+          break;
+        case 'forma':
+          comparison = (a.formaPgto || '').localeCompare(b.formaPgto || '', 'pt-BR');
+          break;
+        default:
+          comparison = 0;
+      }
+
+      if (comparison === 0) {
+        // Desempate natural inteligente: parcela, depois beneficiário
+        if (sortField !== 'parcela') {
+          const parcelaDiff = a.parcela - b.parcela;
+          if (parcelaDiff !== 0) return parcelaDiff;
+        }
+        return a.nome.localeCompare(b.nome, 'pt-BR');
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [filteredPayments, sortField, sortDirection]);
 
   // Seleção múltipla para emissão de recibos na tabela de pagamentos
   const [selectedTablePaymentIds, setSelectedTablePaymentIds] = useState<Set<string>>(new Set());
@@ -289,7 +403,11 @@ export function App() {
   // Abre a tela de conferência de recibos antes de gerar os arquivos
   const handleOpenReceiptsPreview = () => {
     if (paidPaymentsForEmission.length === 0) {
-      alert('Nenhuma parcela com status PAGO selecionada para emissão de recibo.');
+      showToast(
+        'warning',
+        'Nenhuma Parcela Paga',
+        'Nenhuma parcela com status PAGO selecionada para emissão de recibo.'
+      );
       return;
     }
     setIsBatchPreviewModalOpen(true);
@@ -729,49 +847,76 @@ export function App() {
   };
 
   // Export CSV
-  const handleExportCsv = () => {
-    const headers = [
-      'NOME',
-      'CPF',
-      'PARCELA',
-      'VALOR',
-      'DATA',
-      'FORMA PGTO',
-      'CHAVE',
-      'BANCO',
-      'SALDO',
-      'DIA',
-      'MÊS',
-      'ANO',
-      'CIDADE / UF',
-    ];
-    const rows = payments.map((p) => [
-      `"${p.nome}"`,
-      `"${p.cpf}"`,
-      p.parcela,
-      p.valor,
-      p.data,
-      `"${p.formaPgto}"`,
-      `"${p.chave}"`,
-      `"${p.banco}"`,
-      p.saldo,
-      `"${p.dia}"`,
-      `"${p.mes}"`,
-      `"${p.ano}"`,
-      `"${p.cidadeUf}"`,
-    ]);
+  const handleExportCsv = async () => {
+    try {
+      if (isBackendConnected) {
+        const res = await fetch('/api/export/csv');
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `CONTROLE_PAGAMENTOS_${new Date().toISOString().slice(0, 10)}.csv`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          showToast('success', 'Exportação Concluída', 'Planilha CSV exportada com sucesso.');
+          return;
+        }
+      }
 
-    const csvContent =
-      'data:text/csv;charset=utf-8,\uFEFF' +
-      [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
+      // Fallback local robusto gerando Blob binário UTF-8 com BOM
+      const headers = [
+        'NOME',
+        'CPF',
+        'PARCELA',
+        'STATUS',
+        'VALOR',
+        'DATA PAGAMENTO',
+        'DATA PREVISTA',
+        'FORMA PGTO',
+        'CHAVE PIX',
+        'BANCO',
+        'SALDO DEVEDOR',
+        'DIA',
+        'MÊS',
+        'ANO',
+        'CIDADE / UF',
+      ];
+      const rows = payments.map((p) => [
+        `"${p.nome.replace(/"/g, '""')}"`,
+        `"${p.cpf}"`,
+        p.parcela,
+        `"${p.status}"`,
+        p.valor.toFixed(2).replace('.', ','),
+        `"${p.dataPagamento || ''}"`,
+        `"${p.dataPrevista || ''}"`,
+        `"${(p.formaPgto || '').replace(/"/g, '""')}"`,
+        `"${(p.chave || '').replace(/"/g, '""')}"`,
+        `"${(p.banco || '').replace(/"/g, '""')}"`,
+        p.saldo.toFixed(2).replace('.', ','),
+        `"${p.dia || ''}"`,
+        `"${p.mes || ''}"`,
+        `"${p.ano || ''}"`,
+        `"${(p.cidadeUf || '').replace(/"/g, '""')}"`,
+      ]);
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `CONTROLE_PAGAMENTOS_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const csvContent =
+        '\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `CONTROLE_PAGAMENTOS_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast('success', 'Exportação Concluída', 'Planilha CSV gerada e baixada com sucesso.');
+    } catch (err: any) {
+      showToast('error', 'Erro na Exportação', err?.message || 'Falha ao exportar planilha CSV.');
+    }
   };
 
   return (
@@ -1319,12 +1464,12 @@ export function App() {
                 <table className="w-full text-left text-xs text-slate-700">
                   <thead className="bg-slate-50/90 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[11px]">
                     <tr>
-                      <th className="py-2.5 px-3 text-center w-10">
+                      <th className="py-2.5 px-3 text-center w-10 select-none">
                         <input
                           type="checkbox"
                           checked={
-                            filteredPayments.length > 0 &&
-                            filteredPayments.every((p) =>
+                            sortedFilteredPayments.length > 0 &&
+                            sortedFilteredPayments.every((p) =>
                               selectedTablePaymentIds.has(p.id)
                             )
                           }
@@ -1332,13 +1477,13 @@ export function App() {
                             if (e.target.checked) {
                               setSelectedTablePaymentIds((prev) => {
                                 const next = new Set(prev);
-                                filteredPayments.forEach((p) => next.add(p.id));
+                                sortedFilteredPayments.forEach((p) => next.add(p.id));
                                 return next;
                               });
                             } else {
                               setSelectedTablePaymentIds((prev) => {
                                 const next = new Set(prev);
-                                filteredPayments.forEach((p) => next.delete(p.id));
+                                sortedFilteredPayments.forEach((p) => next.delete(p.id));
                                 return next;
                               });
                             }
@@ -1347,26 +1492,162 @@ export function App() {
                           title="Marcar/Desmarcar todas as parcelas visíveis (pagas e previstas)"
                         />
                       </th>
-                      <th className="py-2.5 px-3.5 font-semibold">Beneficiário</th>
-                      <th className="py-2.5 px-2 font-semibold text-center">Parcela</th>
-                      <th className="py-2.5 px-2 font-semibold text-center">Status</th>
-                      <th className="py-2.5 px-3 font-semibold text-center">Previsão</th>
-                      <th className="py-2.5 px-3 font-semibold text-center">Data Pgto</th>
-                      <th className="py-2.5 px-3 font-semibold text-right">Valor</th>
-                      <th className="py-2.5 px-3 font-semibold text-right">Saldo Restante</th>
-                      <th className="py-2.5 px-3 font-semibold">Forma / Pix</th>
-                      <th className="py-2.5 px-3.5 font-semibold text-right">Ações & Recibo</th>
+                      <th
+                        onClick={() => handleSort('beneficiario')}
+                        className="py-2.5 px-3.5 font-semibold cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                        title="Clique para ordenar por Beneficiário (A-Z / Z-A)"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Beneficiário</span>
+                          {sortField === 'beneficiario' ? (
+                            sortDirection === 'asc' ? (
+                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                            ) : (
+                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-400" />
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSort('parcela')}
+                        className="py-2.5 px-2 font-semibold text-center cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                        title="Clique para ordenar por Número da Parcela (1 a 18 / 18 a 1)"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>Parcela</span>
+                          {sortField === 'parcela' ? (
+                            sortDirection === 'asc' ? (
+                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                            ) : (
+                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-400" />
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSort('status')}
+                        className="py-2.5 px-2 font-semibold text-center cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                        title="Clique para ordenar por Status (Pago / Previsto)"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>Status</span>
+                          {sortField === 'status' ? (
+                            sortDirection === 'asc' ? (
+                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                            ) : (
+                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-400" />
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSort('previsao')}
+                        className="py-2.5 px-3 font-semibold text-center cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                        title="Clique para ordenar por Data de Previsão"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>Previsão</span>
+                          {sortField === 'previsao' ? (
+                            sortDirection === 'asc' ? (
+                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                            ) : (
+                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-400" />
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSort('dataPgto')}
+                        className="py-2.5 px-3 font-semibold text-center cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                        title="Clique para ordenar por Data de Pagamento"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>Data Pgto</span>
+                          {sortField === 'dataPgto' ? (
+                            sortDirection === 'asc' ? (
+                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                            ) : (
+                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-400" />
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSort('valor')}
+                        className="py-2.5 px-3 font-semibold text-right cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                        title="Clique para ordenar por Valor da Parcela"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>Valor</span>
+                          {sortField === 'valor' ? (
+                            sortDirection === 'asc' ? (
+                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                            ) : (
+                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-400" />
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSort('saldo')}
+                        className="py-2.5 px-3 font-semibold text-right cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                        title="Clique para ordenar por Saldo Devedor Restante"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>Saldo Restante</span>
+                          {sortField === 'saldo' ? (
+                            sortDirection === 'asc' ? (
+                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                            ) : (
+                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-400" />
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSort('forma')}
+                        className="py-2.5 px-3 font-semibold cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                        title="Clique para ordenar por Forma / Chave PIX"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Forma / Pix</span>
+                          {sortField === 'forma' ? (
+                            sortDirection === 'asc' ? (
+                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                            ) : (
+                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-400" />
+                          )}
+                        </div>
+                      </th>
+                      <th className="py-2.5 px-3.5 font-semibold text-right select-none">Ações & Recibo</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-sans">
-                    {filteredPayments.length === 0 ? (
+                    {sortedFilteredPayments.length === 0 ? (
                       <tr>
                         <td colSpan={10} className="py-8 text-center text-slate-400">
                           Nenhum registro de pagamento encontrado para os filtros selecionados.
                         </td>
                       </tr>
                     ) : (
-                      filteredPayments.map((p) => {
+                      sortedFilteredPayments.map((p) => {
                         const rowIsPrevisto = isPrevisto(p.status);
                         const isSelected = selectedTablePaymentIds.has(p.id);
 
@@ -1962,6 +2243,9 @@ export function App() {
         selectedPayments={paymentsForEmission}
         contract={contract}
       />
+
+      {/* Notificações Toast Modernas */}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }

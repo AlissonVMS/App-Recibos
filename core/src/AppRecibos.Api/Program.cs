@@ -417,6 +417,53 @@ if (!string.IsNullOrEmpty(distDir))
     app.MapFallbackToFile("index.html", new StaticFileOptions { FileProvider = fileProvider });
 }
 
+// Exportar para CSV
+app.MapGet("/api/export/csv", async (PagamentoRepository pagRepo, BeneficiarioRepository benRepo) =>
+{
+    var pagamentos = (await pagRepo.GetAllAsync())
+        .OrderBy(p => p.ParcelaNumero)
+        .ThenBy(p => p.BeneficiarioNome)
+        .ToList();
+
+    var benMap = (await benRepo.GetAllAsync()).ToDictionary(b => b.Id, b => b);
+
+    var sb = new System.Text.StringBuilder();
+    sb.AppendLine("NOME;CPF;PARCELA;STATUS;VALOR;DATA PAGAMENTO;DATA PREVISTA;FORMA PGTO;CHAVE PIX;BANCO;SALDO DEVEDOR;DIA;MÊS;ANO;CIDADE / UF");
+
+    var mesesPt = new[] { "", "janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro" };
+
+    string EscapeCsv(string? val) => (val ?? "").Replace("\"", "\"\"");
+
+    foreach (var p in pagamentos)
+    {
+        benMap.TryGetValue(p.BeneficiarioId, out var ben);
+        var cidadeUf = ben?.CidadeUf ?? "Maceió - AL";
+
+        string dia = "", mes = "", ano = "";
+        if (!string.IsNullOrWhiteSpace(p.DataPagamento) && DateTime.TryParse(p.DataPagamento, out var dtPag))
+        {
+            dia = dtPag.Day.ToString("00");
+            mes = (dtPag.Month >= 1 && dtPag.Month <= 12) ? mesesPt[dtPag.Month] : "";
+            ano = dtPag.Year.ToString();
+        }
+
+        var valorStr = p.Valor.ToString("F2", new System.Globalization.CultureInfo("pt-BR"));
+        var saldoStr = p.SaldoAposParcela.ToString("F2", new System.Globalization.CultureInfo("pt-BR"));
+        var statusStr = p.Status == AppRecibos.Core.Domain.Enums.StatusParcela.Pago ? "PAGO" : "PREVISTO";
+
+        sb.AppendLine($"\"{EscapeCsv(p.BeneficiarioNome)}\";\"{EscapeCsv(p.BeneficiarioCpf)}\";{p.ParcelaNumero};\"{statusStr}\";{valorStr};\"{p.DataPagamento ?? ""}\";\"{p.DataPrevista ?? ""}\";\"{EscapeCsv(p.FormaPgto)}\";\"{EscapeCsv(p.ChavePix)}\";\"{EscapeCsv(p.Banco)}\";{saldoStr};\"{dia}\";\"{mes}\";\"{ano}\";\"{EscapeCsv(cidadeUf)}\"");
+    }
+
+    var preamble = System.Text.Encoding.UTF8.GetPreamble();
+    var contentBytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+    var fullBytes = new byte[preamble.Length + contentBytes.Length];
+    Buffer.BlockCopy(preamble, 0, fullBytes, 0, preamble.Length);
+    Buffer.BlockCopy(contentBytes, 0, fullBytes, preamble.Length, contentBytes.Length);
+
+    var fileName = $"CONTROLE_PAGAMENTOS_{DateTime.Now:yyyy-MM-dd}.csv";
+    return Results.File(fullBytes, "text/csv; charset=utf-8", fileName);
+});
+
 app.Run();
 
 record QuitarRequest(string? DataPagamento);
