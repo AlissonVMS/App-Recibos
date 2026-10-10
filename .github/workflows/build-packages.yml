@@ -1,8 +1,8 @@
 name: Build Desktop Packages
 
 on:
-  push:
-    branches: [ "main" ]
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -21,11 +21,11 @@ jobs:
             rid: win-x64
             archive: zip
           - os: macos-x64
-            runner: macos-13
+            runner: ubuntu-latest
             rid: osx-x64
             archive: zip
           - os: macos-arm64
-            runner: macos-latest
+            runner: ubuntu-latest
             rid: osx-arm64
             archive: zip
 
