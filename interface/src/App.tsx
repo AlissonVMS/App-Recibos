@@ -1322,126 +1322,71 @@ export function App() {
               </div>
             </div>
 
-            {/* Filter and Search Bar */}
-            <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Pesquisar por beneficiário, CPF, parcela, banco..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:outline-hidden"
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1.5">
-                  <Filter className="w-4 h-4 text-slate-400" />
-                  <select
-                    value={filterBeneficiary}
-                    onChange={(e) => setFilterBeneficiary(e.target.value)}
-                    className="text-xs rounded-lg border border-slate-200 bg-slate-50 py-2 px-2.5 focus:bg-white focus:border-blue-500 focus:outline-hidden"
-                  >
-                    <option value="todos">Todos os Beneficiários</option>
-                    {beneficiaries.map((b) => (
-                      <option key={b.id} value={b.nome}>
-                        {b.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as any)}
-                  className="text-xs rounded-lg border border-slate-200 bg-slate-50 py-2 px-2.5 focus:bg-white focus:border-blue-500 focus:outline-hidden font-semibold"
-                >
-                  <option value="todos">Status: Todos</option>
-                  <option value="PAGO">Somente Pagos ({payments.filter(p => isPago(p.status)).length})</option>
-                  <option value="PREVISTO">Somente Previstos ({payments.filter(p => isPrevisto(p.status)).length})</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Barra Conveniente de Seleção para Emissão de Recibos */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 px-4 flex flex-col gap-2.5 text-xs">
-              {/* Linha 1: Contagem e Botões em Linha Confortável */}
-              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-                {/* Resumo com badges e whitespace-nowrap para nunca quebrar de forma desconfortável */}
-                <div className="flex items-center gap-2 whitespace-nowrap shrink-0">
-                  <span className="font-semibold text-slate-700 inline-flex items-center gap-1.5 flex-wrap">
-                    {selectedTablePayments.length > 0 ? (
-                      <>
-                        <span className="bg-blue-100 text-blue-900 font-bold px-2.5 py-0.5 rounded-md font-mono text-xs shadow-2xs">
-                          {selectedTablePayments.length} selecionada{selectedTablePayments.length > 1 ? 's' : ''}
-                        </span>
-                        <span className="text-slate-400 font-bold">•</span>
-                        <span className="bg-emerald-100 text-emerald-900 font-bold px-2.5 py-0.5 rounded-md font-mono text-xs shadow-2xs">
-                          {selectedPaidTablePayments.length} paga{selectedPaidTablePayments.length > 1 ? 's' : ''} ({formatarMoeda(selectedPaidTablePayments.reduce((acc, p) => acc + p.valor, 0))})
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-slate-500 font-normal">
-                        Nenhuma parcela marcada manualmente. Clique nas caixas de seleção da tabela para marcar em lote.
-                      </span>
-                    )}
-                  </span>
-                </div>
-
-                {/* Botões de Ação Redimensionados para Visualização Confortável em Linha */}
-                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                  {/* Ações em lote para parcelas selecionadas */}
-                  {selectedTablePayments.length > 0 && (
-                    <>
-                      {selectedPrevistoTablePayments.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleBatchMarkAsPaid}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow-2xs transition-colors whitespace-nowrap"
-                          title="Marcar todas as parcelas previstas selecionadas como PAGAS"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Pagar ({selectedPrevistoTablePayments.length})</span>
-                        </button>
-                      )}
-
-                      {selectedPaidTablePayments.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleBatchRevertToPrevisto}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-md shadow-2xs transition-colors whitespace-nowrap"
-                          title="Desmarcar pagamentos e reverter parcelas selecionadas para PREVISTO"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Reverter ({selectedPaidTablePayments.length})</span>
-                        </button>
-                      )}
-
-                      {selectedPaidTablePayments.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleOpenReceiptsPreview}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-xs transition-colors whitespace-nowrap"
-                          title="Conferir previamente e emitir recibos das parcelas pagas selecionadas"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          <span>Emitir ({selectedPaidTablePayments.length})</span>
-                        </button>
-                      )}
-
-                      <div className="h-4 w-px bg-slate-300 mx-0.5 hidden sm:block" />
-                    </>
+            {/* Barra Fixa Unificada de Pesquisa, Filtros e Ações de Seleção (Estilo Planilha Excel) */}
+            <div className="sticky top-[106px] z-20 bg-slate-50/95 backdrop-blur-md pt-1 pb-2.5 -mt-1 space-y-2">
+              {/* Barra Principal: Caixa de Pesquisa, Filtros e Atalhos de Seleção */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-2.5 sm:p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                {/* Campo de Pesquisa Rápida */}
+                <div className="relative flex-1 min-w-[240px]">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Pesquisar por beneficiário, CPF, parcela, banco..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-8 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:outline-hidden transition-colors"
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200 transition-colors"
+                      title="Limpar pesquisa"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   )}
+                </div>
 
+                {/* Filtros e Atalhos de Seleção */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+                    <select
+                      value={filterBeneficiary}
+                      onChange={(e) => setFilterBeneficiary(e.target.value)}
+                      className="text-xs rounded-lg border border-slate-200 bg-slate-50 py-2 px-2.5 focus:bg-white focus:border-blue-500 focus:outline-hidden cursor-pointer"
+                    >
+                      <option value="todos">Todos os Beneficiários</option>
+                      {beneficiaries.map((b) => (
+                        <option key={b.id} value={b.nome}>
+                          {b.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value as any)}
+                    className="text-xs rounded-lg border border-slate-200 bg-slate-50 py-2 px-2.5 focus:bg-white focus:border-blue-500 focus:outline-hidden font-semibold cursor-pointer"
+                  >
+                    <option value="todos">Status: Todos</option>
+                    <option value="PAGO">Somente Pagos ({payments.filter((p) => isPago(p.status)).length})</option>
+                    <option value="PREVISTO">Somente Previstos ({payments.filter((p) => isPrevisto(p.status)).length})</option>
+                  </select>
+
+                  <div className="h-4 w-px bg-slate-300 mx-0.5 hidden sm:block" />
+
+                  {/* Atalhos de Seleção Rápida */}
                   <button
                     type="button"
                     onClick={() => {
                       const allIds = filteredPayments.map((p) => p.id);
                       setSelectedTablePaymentIds(new Set(allIds));
                     }}
-                    className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 rounded-md border border-slate-300 transition-colors whitespace-nowrap"
-                    title="Selecionar todos os itens exibidos (pagos e previstos)"
+                    className="px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-300 transition-colors whitespace-nowrap cursor-pointer"
+                    title="Selecionar todos os registros visíveis na tabela"
                   >
                     Todos ({filteredPayments.length})
                   </button>
@@ -1453,10 +1398,10 @@ export function App() {
                         .map((p) => p.id);
                       setSelectedTablePaymentIds(new Set(allPaidIds));
                     }}
-                    className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md border border-blue-200 transition-colors whitespace-nowrap"
+                    className="px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors whitespace-nowrap cursor-pointer"
                     title="Selecionar apenas as parcelas com status PAGO"
                   >
-                    Somente Pagos ({payments.filter((p) => isPago(p.status)).length})
+                    Pagos ({payments.filter((p) => isPago(p.status)).length})
                   </button>
                   <button
                     type="button"
@@ -1466,40 +1411,102 @@ export function App() {
                         .map((p) => p.id);
                       setSelectedTablePaymentIds(new Set(allPrevistoIds));
                     }}
-                    className="px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md border border-amber-200 transition-colors whitespace-nowrap"
+                    className="px-2.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors whitespace-nowrap cursor-pointer"
                     title="Selecionar apenas as parcelas com status PREVISTO"
                   >
-                    Somente Previstos ({payments.filter((p) => isPrevisto(p.status)).length})
+                    Previstos ({payments.filter((p) => isPrevisto(p.status)).length})
                   </button>
-                  {selectedTablePaymentIds.size > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTablePaymentIds(new Set())}
-                      className="px-2.5 py-1 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 rounded-md border border-slate-200 transition-colors whitespace-nowrap"
-                      title="Desmarcar todas as parcelas selecionadas"
-                    >
-                      Desmarcar
-                    </button>
-                  )}
                 </div>
               </div>
 
-              {/* Linha 2 (Abaixo dos botões, nunca os desloca): Aviso Informativo */}
+              {/* Faixa Fixa de Ações da Seleção (Surge com destaque sempre que houver itens marcados) */}
+              {selectedTablePayments.length > 0 && (
+                <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-xl p-2.5 px-4 shadow-md border border-blue-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-150">
+                  {/* Resumo da Seleção com Badges de Alto Contraste */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-300">Seleção Ativa:</span>
+                    <span className="bg-blue-500/20 text-blue-300 border border-blue-400/30 font-bold px-2.5 py-0.5 rounded-md font-mono text-xs">
+                      {selectedTablePayments.length} selecionada{selectedTablePayments.length > 1 ? 's' : ''}
+                    </span>
+                    {selectedPaidTablePayments.length > 0 && (
+                      <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-bold px-2.5 py-0.5 rounded-md font-mono text-xs">
+                        {selectedPaidTablePayments.length} paga{selectedPaidTablePayments.length > 1 ? 's' : ''} ({formatarMoeda(selectedPaidTablePayments.reduce((acc, p) => acc + p.valor, 0))})
+                      </span>
+                    )}
+                    {selectedPrevistoTablePayments.length > 0 && (
+                      <span className="bg-amber-500/20 text-amber-300 border border-amber-400/30 font-bold px-2.5 py-0.5 rounded-md font-mono text-xs">
+                        {selectedPrevistoTablePayments.length} prevista{selectedPrevistoTablePayments.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Botões de Ação Imediata da Seleção */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {selectedPrevistoTablePayments.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleBatchMarkAsPaid}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                        title="Marcar todas as parcelas previstas selecionadas como PAGAS"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Quitar / Pagar ({selectedPrevistoTablePayments.length})</span>
+                      </button>
+                    )}
+
+                    {selectedPaidTablePayments.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleBatchRevertToPrevisto}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-200 bg-amber-950/80 hover:bg-amber-900 border border-amber-500/40 rounded-lg shadow-sm transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                        title="Desmarcar pagamentos e reverter parcelas selecionadas para PREVISTO"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Reverter ({selectedPaidTablePayments.length})</span>
+                      </button>
+                    )}
+
+                    {selectedPaidTablePayments.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleOpenReceiptsPreview}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-md transition-all cursor-pointer whitespace-nowrap active:scale-95 ring-2 ring-blue-400/30"
+                        title="Conferir previamente e emitir recibos das parcelas pagas selecionadas"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Emitir Recibo(s) ({selectedPaidTablePayments.length})</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTablePaymentIds(new Set())}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+                      title="Desmarcar todas as parcelas selecionadas"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Desmarcar</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Aviso Informativo Discreto para Seleções com Previstos */}
               {selectedPrevistoTablePayments.length > 0 && (
-                <div className="w-full bg-blue-50/80 text-blue-900 border border-blue-200/90 px-3 py-2 rounded-lg font-medium text-[11px] flex items-center gap-2 shadow-2xs border-t border-slate-200/50 mt-0.5">
+                <div className="w-full bg-blue-50/90 text-blue-900 border border-blue-200/90 px-3 py-1.5 rounded-lg font-medium text-[11px] flex items-center gap-2 shadow-2xs">
                   <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                   <span>
-                    <strong>Aviso Informativo:</strong> Foram marcados {selectedTablePayments.length} itens no total, incluindo {selectedPrevistoTablePayments.length} com status PREVISTO — apenas as {selectedPaidTablePayments.length} parcelas quitadas estão sendo emitidas.
+                    <strong>Aviso Informativo:</strong> {selectedPrevistoTablePayments.length} parcelas selecionadas têm status PREVISTO. Recibos são gerados apenas para parcelas quitadas. Clique em "Quitar / Pagar" acima para liquidá-las.
                   </span>
                 </div>
               )}
             </div>
 
-            {/* Table */}
+            {/* Table com Cabeçalho Fixo (Freeze Panes estilo Excel) */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-auto max-h-[calc(100vh-275px)] min-h-[460px]">
                 <table className="w-full text-left text-xs text-slate-700">
-                  <thead className="bg-slate-50/90 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                  <thead className="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase tracking-wider text-[11px] sticky top-0 z-10 shadow-2xs">
                     <tr>
                       <th className="py-2.5 px-3 text-center w-10 select-none">
                         <input
