@@ -1,0 +1,89 @@
+name: Build Desktop Packages
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }} (${{ matrix.rid }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+            rid: linux-x64
+            archive: tar.gz
+          - os: windows
+            runner: windows-latest
+            rid: win-x64
+            archive: zip
+          - os: macos-x64
+            runner: macos-13
+            rid: osx-x64
+            archive: zip
+          - os: macos-arm64
+            runner: macos-latest
+            rid: osx-arm64
+            archive: zip
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Install Dependencies & Build Frontend
+      run: |
+        npm install
+        npm run build
+
+    - name: Setup .NET 9
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+
+    - name: Publish Desktop App
+      run: dotnet publish core/src/AppRecibos.Desktop/AppRecibos.Desktop.csproj -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/${{ matrix.rid }}
+
+    - name: Bundle Assets
+      shell: bash
+      run: |
+        mkdir -p publish/${{ matrix.rid }}/wwwroot publish/${{ matrix.rid }}/interface/dist
+        cp -r interface/dist/* publish/${{ matrix.rid }}/wwwroot/
+        cp -r interface/dist/* publish/${{ matrix.rid }}/interface/dist/
+        # Include an empty template Excel file if needed, or rely on the application to handle missing file
+        if [ -f "CONTROLE PAGAMENTOS.xlsx" ]; then
+            cp -f "CONTROLE PAGAMENTOS.xlsx" publish/${{ matrix.rid }}/
+        fi
+
+    - name: Package Windows
+      if: matrix.os == 'windows'
+      run: Compress-Archive -Path publish/${{ matrix.rid }}/* -DestinationPath AppRecibos-${{ matrix.rid }}.zip
+
+    - name: Package Linux
+      if: matrix.os == 'linux'
+      shell: bash
+      run: |
+        cd publish/${{ matrix.rid }}
+        tar -czvf ../../AppRecibos-${{ matrix.rid }}.tar.gz *
+
+    - name: Package macOS
+      if: startsWith(matrix.os, 'macos')
+      shell: bash
+      run: |
+        cd publish/${{ matrix.rid }}
+        zip -r ../../AppRecibos-${{ matrix.rid }}.zip *
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AppRecibos-${{ matrix.rid }}
+        path: |
+          AppRecibos-${{ matrix.rid }}.zip
+          AppRecibos-${{ matrix.rid }}.tar.gz
