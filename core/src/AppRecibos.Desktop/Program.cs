@@ -84,8 +84,13 @@ public class Program
         
         try
         {
+            string iconPath = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)
+                ? "app-icon.ico" 
+                : "app-icon.png";
+
             var window = new PhotinoWindow()
                 .SetTitle("App-Recibos - Gestão Financeira & Recibos Civis")
+                .SetIconFile(iconPath)
                 .SetSize(1280, 860)
                 .SetMinSize(900, 600)
                 .Center()
