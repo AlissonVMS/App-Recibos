@@ -65,4 +65,7 @@ fi
 
 # Executa o aplicativo desktop nativo
 echo "[App-Recibos] Iniciando aplicativo Desktop..."
+# Garante encerramento de instâncias antigas ou travadas em background
+pkill -9 -f "AppRecibos.Desktop" 2>/dev/null || true
+sleep 0.2
 exec ./publish/AppRecibos.Desktop "$@"
