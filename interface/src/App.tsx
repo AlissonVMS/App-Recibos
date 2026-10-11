@@ -367,6 +367,7 @@ export function App() {
   // Seleção múltipla para emissão de recibos na tabela de pagamentos
   const [selectedTablePaymentIds, setSelectedTablePaymentIds] = useState<Set<string>>(new Set());
   const [viewingReceiptPayment, setViewingReceiptPayment] = useState<PaymentRecord | null>(null);
+  const [isDownloadingReceipt, setIsDownloadingReceipt] = useState<boolean>(false);
   const [isBatchPreviewModalOpen, setIsBatchPreviewModalOpen] = useState<boolean>(false);
 
   // Estado para diálogo de confirmação com padrão sênior de UX/UI e Financeiro
@@ -2143,7 +2144,9 @@ export function App() {
 
               <button
                 type="button"
-                onClick={() => {
+                disabled={isDownloadingReceipt}
+                onClick={async () => {
+                  if (isDownloadingReceipt) return;
                   if (isPrevisto(viewingReceiptPayment.status)) {
                     setConfirmDialog({
                       isOpen: true,
@@ -2158,29 +2161,43 @@ export function App() {
                         'Recibos oficiais de quitação plena exigem que a parcela esteja com status PAGO. Ao confirmar, o pagamento será liquidado e o download iniciado.',
                       confirmLabel: 'Quitar e Baixar PDF',
                       confirmVariant: 'emerald',
-                      onConfirm: () => {
+                      onConfirm: async () => {
                         executeMarkAsPaid(viewingReceiptPayment.id);
                         const updated = { ...viewingReceiptPayment, status: 'PAGO' as const };
                         setViewingReceiptPayment(updated);
                         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-                        setTimeout(() => {
-                          baixarPdfRecibo(updated, contract);
-                        }, 300);
+                        setIsDownloadingReceipt(true);
+                        try {
+                          await baixarPdfRecibo(updated, contract);
+                        } finally {
+                          setIsDownloadingReceipt(false);
+                        }
                       },
                     });
                     return;
                   }
-                  baixarPdfRecibo(viewingReceiptPayment, contract);
+                  setIsDownloadingReceipt(true);
+                  try {
+                    await baixarPdfRecibo(viewingReceiptPayment, contract);
+                  } finally {
+                    setIsDownloadingReceipt(false);
+                  }
                 }}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-all cursor-pointer"
+                className={`inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white rounded-lg shadow-xs transition-all ${
+                  isDownloadingReceipt ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 cursor-pointer'
+                }`}
                 title={
                   isPrevisto(viewingReceiptPayment.status)
                     ? 'Parcela prevista: clique para quitar e baixar PDF'
                     : `Baixar PDF: ${gerarNomeArquivoRecibo(viewingReceiptPayment)}`
                 }
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Baixar PDF</span>
+                {isDownloadingReceipt ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5" />
+                )}
+                <span>{isDownloadingReceipt ? 'Baixando...' : 'Baixar PDF'}</span>
               </button>
             </div>
           </header>

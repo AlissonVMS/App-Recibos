@@ -765,7 +765,12 @@ export async function baixarPdfRecibosConsolidados(
 ): Promise<SaveResult> {
   const doc = criarDocumentoPdfRecibosMultiplos(pagamentos, contrato);
   const blob = doc.output('blob');
-  return await salvarArquivoNativoOuWeb(blob, nomeArquivo, 'pdf');
+  return await salvarArquivoNativoOuWeb({
+    data: blob,
+    fileName: nomeArquivo,
+    fileType: 'pdf',
+    title: 'Salvar Recibos Consolidados em PDF',
+  });
 }
 
 export async function baixarPdfRecibo(
@@ -773,6 +778,20 @@ export async function baixarPdfRecibo(
   contrato: ContractConfig
 ): Promise<SaveResult> {
   const nomeArquivo = gerarNomeArquivoRecibo(pagamento);
+
+  // @ts-ignore
+  const isPhotino = typeof window !== 'undefined' && window.external && typeof window.external.sendMessage === 'function';
+
+  // Se estamos no Photino Desktop, delegamos a busca e escrita diretamente ao C#
+  // evitando sobrecarga de IPC em Base64
+  if (isPhotino) {
+    return await salvarArquivoNativoOuWeb({
+      url: `/api/recibos/${pagamento.id}/pdf`,
+      fileName: nomeArquivo,
+      fileType: 'pdf',
+      title: 'Salvar Recibo em PDF',
+    });
+  }
 
   let blob: Blob | null = null;
   // Tenta baixar o PDF oficial gerado nativamente pelo QuestPDF em memória C#
@@ -792,7 +811,12 @@ export async function baixarPdfRecibo(
     blob = doc.output('blob');
   }
 
-  return await salvarArquivoNativoOuWeb(blob, nomeArquivo, 'pdf');
+  return await salvarArquivoNativoOuWeb({
+    data: blob,
+    fileName: nomeArquivo,
+    fileType: 'pdf',
+    title: 'Salvar Recibo em PDF',
+  });
 }
 
 /**
@@ -807,6 +831,20 @@ export async function baixarPdfRecibosZip(
   if (pagos.length === 0) return { success: false, message: 'Nenhum pagamento quitado selecionado.' };
 
   const nomeFinalZip = nomeZip.endsWith('.zip') ? nomeZip : `${nomeZip}.zip`;
+
+  // @ts-ignore
+  const isPhotino = typeof window !== 'undefined' && window.external && typeof window.external.sendMessage === 'function';
+
+  // Se estamos no Photino Desktop, delega a geração do pacote ZIP em lote diretamente ao C#
+  if (isPhotino) {
+    return await salvarArquivoNativoOuWeb({
+      url: '/api/recibos/lote-zip',
+      postData: { paymentIds: pagos.map((p) => p.id) },
+      fileName: nomeFinalZip,
+      fileType: 'zip',
+      title: 'Salvar Pacote de Recibos em ZIP',
+    });
+  }
 
   let zipBlob: Blob | null = null;
   // Tenta gerar pacote ZIP em lote no backend via QuestPDF
@@ -849,7 +887,12 @@ export async function baixarPdfRecibosZip(
     zipBlob = await zip.generateAsync({ type: 'blob' });
   }
 
-  return await salvarArquivoNativoOuWeb(zipBlob, nomeFinalZip, 'zip');
+  return await salvarArquivoNativoOuWeb({
+    data: zipBlob,
+    fileName: nomeFinalZip,
+    fileType: 'zip',
+    title: 'Salvar Pacote de Recibos em ZIP',
+  });
 }
 
 /**

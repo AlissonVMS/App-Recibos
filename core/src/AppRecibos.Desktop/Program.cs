@@ -105,41 +105,45 @@ public class Program
 
             window.RegisterWebMessageReceivedHandler((sender, message) =>
             {
-                var w = (PhotinoWindow)sender;
+                var w = sender as PhotinoWindow ?? window;
+                if (w == null) return;
 
                 if (message == "request-save-csv")
                 {
                     var defaultFileName = $"CONTROLE_PAGAMENTOS_{DateTime.Now:yyyy-MM-dd}.csv";
-                    var defaultPath = Path.Combine(lastSaveDir, defaultFileName);
                     var filters = new (string, string[])[] { ("Planilha CSV (*.csv)", new[] { "csv" }), ("Todos os arquivos", new[] { "*" }) };
                     
-                    // Executa a janela nativa de diálogo na thread principal de UI
-                    var path = w.ShowSaveFile("Salvar Planilha de Pagamentos CSV", defaultPath, filters);
+                    var path = Services.NativeFileDialogService.ShowSaveFileDialog(
+                        w,
+                        "Salvar Planilha de Pagamentos CSV",
+                        lastSaveDir,
+                        defaultFileName,
+                        "csv",
+                        filters);
                     
-                    if (!string.IsNullOrWhiteSpace(path))
-                    {
-                        if (!Path.HasExtension(path)) path += ".csv";
-                        var dir = Path.GetDirectoryName(path);
-                        if (!string.IsNullOrWhiteSpace(dir)) lastSaveDir = dir;
-
-                        Task.Run(async () => 
-                        {
-                            try
-                            {
-                                var csvBytes = await httpClient.GetByteArrayAsync($"{targetUrl}/api/export/csv");
-                                await File.WriteAllBytesAsync(path, csvBytes);
-                                w.SendWebMessage(JsonSerializer.Serialize(new { type = "save-success", path = path }));
-                            }
-                            catch (Exception ex)
-                            {
-                                w.SendWebMessage(JsonSerializer.Serialize(new { type = "save-error", message = ex.Message }));
-                            }
-                        });
-                    }
-                    else
+                    if (string.IsNullOrWhiteSpace(path))
                     {
                         w.SendWebMessage(JsonSerializer.Serialize(new { type = "save-cancelled" }));
+                        return;
                     }
+
+                    if (!Path.HasExtension(path)) path += ".csv";
+                    var dir = Path.GetDirectoryName(path);
+                    if (!string.IsNullOrWhiteSpace(dir)) lastSaveDir = dir;
+
+                    Task.Run(async () => 
+                    {
+                        try
+                        {
+                            var csvBytes = await httpClient.GetByteArrayAsync($"{targetUrl}/api/export/csv");
+                            await File.WriteAllBytesAsync(path, csvBytes);
+                            w.SendWebMessage(JsonSerializer.Serialize(new { type = "save-success", path = path, fileName = Path.GetFileName(path) }));
+                        }
+                        catch (Exception ex)
+                        {
+                            w.SendWebMessage(JsonSerializer.Serialize(new { type = "save-error", message = ex.Message }));
+                        }
+                    });
                     return;
                 }
 
@@ -161,6 +165,8 @@ public class Program
                         var fileType = root.TryGetProperty("fileType", out var ftProp) ? ftProp.GetString()?.ToLowerInvariant() : null;
                         var base64 = root.TryGetProperty("base64", out var b64Prop) ? b64Prop.GetString() : null;
                         var url = root.TryGetProperty("url", out var uProp) ? uProp.GetString() : null;
+                        bool hasPostData = root.TryGetProperty("postData", out var postDataProp);
+                        string? postDataJson = hasPostData ? postDataProp.GetRawText() : null;
 
                         var ext = Path.GetExtension(fileName).TrimStart('.').ToLowerInvariant();
                         if (string.IsNullOrEmpty(ext))
@@ -191,10 +197,14 @@ public class Program
                             _ => new (string, string[])[] { ($"Arquivo (*.{ext})", new[] { ext }), ("Todos os arquivos", new[] { "*" }) }
                         };
 
-                        var defaultPath = Path.Combine(lastSaveDir, fileName);
-                        
-                        // Executa ShowSaveFile NA THREAD PRINCIPAL DE UI DO GTK/PHOTINO
-                        var selectedPath = w.ShowSaveFile(dialogTitle, defaultPath, filters);
+                        // Executa diálogo nativo desacoplado e confiável
+                        var selectedPath = Services.NativeFileDialogService.ShowSaveFileDialog(
+                            w,
+                            dialogTitle,
+                            lastSaveDir,
+                            fileName,
+                            ext,
+                            filters);
 
                         if (string.IsNullOrWhiteSpace(selectedPath))
                         {
@@ -217,13 +227,24 @@ public class Program
                             try
                             {
                                 byte[] fileBytes;
-                                if (!string.IsNullOrEmpty(base64))
+                                if (!string.IsNullOrEmpty(url))
+                                {
+                                    var fullUrl = url.StartsWith("http") ? url : $"{targetUrl}{url}";
+                                    if (!string.IsNullOrEmpty(postDataJson))
+                                    {
+                                        using var content = new StringContent(postDataJson, System.Text.Encoding.UTF8, "application/json");
+                                        var resp = await httpClient.PostAsync(fullUrl, content);
+                                        resp.EnsureSuccessStatusCode();
+                                        fileBytes = await resp.Content.ReadAsByteArrayAsync();
+                                    }
+                                    else
+                                    {
+                                        fileBytes = await httpClient.GetByteArrayAsync(fullUrl);
+                                    }
+                                }
+                                else if (!string.IsNullOrEmpty(base64))
                                 {
                                     fileBytes = Convert.FromBase64String(base64);
-                                }
-                                else if (!string.IsNullOrEmpty(url))
-                                {
-                                    fileBytes = await httpClient.GetByteArrayAsync($"{targetUrl}{url}");
                                 }
                                 else
                                 {

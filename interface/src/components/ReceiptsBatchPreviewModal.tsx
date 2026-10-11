@@ -101,9 +101,9 @@ export const ReceiptsBatchPreviewModal: React.FC<ReceiptsBatchPreviewModalProps>
         result = await baixarPdfRecibosZip(paidPayments, contract, suggestedFileName);
       }
 
-      // Fecha a tela de conferência apenas se o arquivo foi salvo com sucesso!
-      // Caso o usuário cancele a janela nativa de salvar, mantém a tela aberta sem jogá-lo de volta.
-      if (result?.success) {
+      // Fecha a tela de conferência apenas se o arquivo foi salvo com sucesso e NÃO foi cancelado!
+      // Caso o usuário cancele a janela nativa de salvar ou ocorra erro, mantém a tela aberta.
+      if (result && result.success && !result.cancelled) {
         onClose();
       }
     } catch (err) {
