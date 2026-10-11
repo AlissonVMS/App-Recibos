@@ -22,6 +22,7 @@ import {
 } from './utils/pdfGenerator';
 import { imprimirElementoRecibo } from './utils/printHelper';
 import { apiService } from './services/apiService';
+import { salvarArquivoNativoOuWeb } from './utils/fileSaver';
 import {
   FileText,
   DollarSign,
@@ -147,13 +148,20 @@ export function App() {
       // @ts-ignore
       window.external.receiveMessage((msg) => {
         try {
-          const parsed = JSON.parse(msg);
+          const parsed = typeof msg === 'string' ? JSON.parse(msg) : msg;
+          // Notifica os utilitários de download e outros ouvintes
+          window.dispatchEvent(new CustomEvent('photino-web-message', { detail: parsed }));
+
           if (parsed.type === 'save-success') {
             showToast('success', 'Salvo com sucesso!', `Arquivo salvo em:\n${parsed.path}`);
           } else if (parsed.type === 'save-error') {
             showToast('error', 'Erro ao Salvar', parsed.message || 'Houve um erro ao tentar salvar o arquivo.');
+          } else if (parsed.type === 'save-cancelled') {
+            showToast('info', 'Download Cancelado', 'A escolha do local para salvar o arquivo foi cancelada.');
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error('Erro ao interpretar mensagem do Photino:', e);
+        }
       });
     }
 
@@ -942,15 +950,11 @@ export function App() {
       const csvContent =
         '\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\r\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `CONTROLE_PAGAMENTOS_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      showToast('success', 'Exportação Concluída', 'Planilha CSV gerada e baixada com sucesso.');
+      const fileName = `CONTROLE_PAGAMENTOS_${new Date().toISOString().slice(0, 10)}.csv`;
+      const saveRes = await salvarArquivoNativoOuWeb(blob, fileName, 'csv');
+      if (saveRes.success) {
+        showToast('success', 'Exportação Concluída', 'Planilha CSV gerada e salva com sucesso.');
+      }
     } catch (err: any) {
       showToast('error', 'Erro na Exportação', err?.message || 'Falha ao exportar planilha CSV.');
     }

@@ -94,12 +94,20 @@ export const ReceiptsBatchPreviewModal: React.FC<ReceiptsBatchPreviewModalProps>
     if (paidPayments.length === 0) return;
     setIsGenerating(true);
     try {
+      let result;
       if (paidPayments.length === 1) {
-        baixarPdfRecibo(paidPayments[0], contract);
+        result = await baixarPdfRecibo(paidPayments[0], contract);
       } else {
-        await baixarPdfRecibosZip(paidPayments, contract, suggestedFileName);
+        result = await baixarPdfRecibosZip(paidPayments, contract, suggestedFileName);
       }
-      onClose();
+
+      // Fecha a tela de conferência apenas se o arquivo foi salvo com sucesso!
+      // Caso o usuário cancele a janela nativa de salvar, mantém a tela aberta sem jogá-lo de volta.
+      if (result?.success) {
+        onClose();
+      }
+    } catch (err) {
+      console.error('Erro ao emitir/salvar recibos:', err);
     } finally {
       setIsGenerating(false);
     }

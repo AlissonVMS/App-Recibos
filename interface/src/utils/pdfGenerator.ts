@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
+import { salvarArquivoNativoOuWeb, SaveResult } from './fileSaver';
 import { ContractConfig, PaymentRecord } from '../types';
 import {
   formatarNumeroMoeda,
@@ -757,113 +758,98 @@ export function criarDocumentoPdfRecibosMultiplos(
   return doc;
 }
 
-export function baixarPdfRecibosConsolidados(
+export async function baixarPdfRecibosConsolidados(
   pagamentos: PaymentRecord[],
   contrato: ContractConfig,
   nomeArquivo: string = 'RECIBOS_CONSOLIDADOS.pdf'
-): void {
+): Promise<SaveResult> {
   const doc = criarDocumentoPdfRecibosMultiplos(pagamentos, contrato);
-  doc.save(nomeArquivo);
+  const blob = doc.output('blob');
+  return await salvarArquivoNativoOuWeb(blob, nomeArquivo, 'pdf');
 }
 
 export async function baixarPdfRecibo(
   pagamento: PaymentRecord,
   contrato: ContractConfig
-): Promise<void> {
+): Promise<SaveResult> {
   const nomeArquivo = gerarNomeArquivoRecibo(pagamento);
 
+  let blob: Blob | null = null;
   // Tenta baixar o PDF oficial gerado nativamente pelo QuestPDF em memória C#
   try {
     const res = await fetch(`/api/recibos/${pagamento.id}/pdf`, {
-      signal: AbortSignal.timeout(2500),
+      signal: AbortSignal.timeout(3000),
     });
     if (res.ok) {
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = nomeArquivo;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      return;
+      blob = await res.blob();
     }
   } catch {
     // Fallback automático para o gerador client-side jsPDF
   }
 
-  const doc = criarDocumentoPdfRecibo(pagamento, contrato);
-  doc.save(nomeArquivo);
+  if (!blob) {
+    const doc = criarDocumentoPdfRecibo(pagamento, contrato);
+    blob = doc.output('blob');
+  }
+
+  return await salvarArquivoNativoOuWeb(blob, nomeArquivo, 'pdf');
 }
 
 /**
- * Gera um arquivo ZIP contendo cada recibo em PDF individual.
+ * Gera um arquivo ZIP contendo cada recibo em PDF individual com janela nativa de salvamento.
  */
 export async function baixarPdfRecibosZip(
   pagamentos: PaymentRecord[],
   contrato: ContractConfig,
   nomeZip: string = 'RECIBOS_INDIVIDUAIS.zip'
-): Promise<void> {
+): Promise<SaveResult> {
   const pagos = pagamentos.filter((p) => (p.status?.toString().toUpperCase() || 'PAGO') === 'PAGO');
-  if (pagos.length === 0) return;
+  if (pagos.length === 0) return { success: false, message: 'Nenhum pagamento quitado selecionado.' };
 
   const nomeFinalZip = nomeZip.endsWith('.zip') ? nomeZip : `${nomeZip}.zip`;
 
+  let zipBlob: Blob | null = null;
   // Tenta gerar pacote ZIP em lote no backend via QuestPDF
   try {
     const res = await fetch('/api/recibos/lote-zip', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paymentIds: pagos.map((p) => p.id) }),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(8000),
     });
     if (res.ok) {
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = nomeFinalZip;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      return;
+      zipBlob = await res.blob();
     }
   } catch {
     // Fallback automático para JSZip no navegador
   }
 
-  const zip = new JSZip();
-  const nomesUsados = new Map<string, number>();
+  if (!zipBlob) {
+    const zip = new JSZip();
+    const nomesUsados = new Map<string, number>();
 
-  for (const pagamento of pagos) {
-    const doc = criarDocumentoPdfRecibo(pagamento, contrato);
-    const pdfBlob = doc.output('blob');
-    let nomeArquivo = gerarNomeArquivoRecibo(pagamento);
-    if (!nomeArquivo.toLowerCase().endsWith('.pdf')) {
-      nomeArquivo += '.pdf';
+    for (const pagamento of pagos) {
+      const doc = criarDocumentoPdfRecibo(pagamento, contrato);
+      const pdfBlob = doc.output('blob');
+      let nomeArquivo = gerarNomeArquivoRecibo(pagamento);
+      if (!nomeArquivo.toLowerCase().endsWith('.pdf')) {
+        nomeArquivo += '.pdf';
+      }
+
+      const count = nomesUsados.get(nomeArquivo) || 0;
+      let nomeFinal = nomeArquivo;
+      if (count > 0) {
+        nomeFinal = nomeArquivo.replace(/\.pdf$/i, `_${count + 1}.pdf`);
+      }
+      nomesUsados.set(nomeArquivo, count + 1);
+
+      zip.file(nomeFinal, pdfBlob);
     }
 
-    const count = nomesUsados.get(nomeArquivo) || 0;
-    let nomeFinal = nomeArquivo;
-    if (count > 0) {
-      nomeFinal = nomeArquivo.replace(/\.pdf$/i, `_${count + 1}.pdf`);
-    }
-    nomesUsados.set(nomeArquivo, count + 1);
-
-    zip.file(nomeFinal, pdfBlob);
+    zipBlob = await zip.generateAsync({ type: 'blob' });
   }
 
-  const zipBlob = await zip.generateAsync({ type: 'blob' });
-  const url = URL.createObjectURL(zipBlob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = nomeFinalZip;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  return await salvarArquivoNativoOuWeb(zipBlob, nomeFinalZip, 'zip');
 }
 
 /**
@@ -875,15 +861,15 @@ export async function emitirRecibos(
   pagamentos: PaymentRecord[],
   contrato: ContractConfig,
   nomeLote?: string
-): Promise<void> {
+): Promise<SaveResult> {
   const pagos = pagamentos.filter((p) => (p.status?.toString().toUpperCase() || 'PAGO') === 'PAGO');
-  if (pagos.length === 0) return;
+  if (pagos.length === 0) return { success: false, message: 'Nenhum pagamento quitado selecionado.' };
 
   if (pagos.length === 1) {
-    baixarPdfRecibo(pagos[0], contrato);
+    return await baixarPdfRecibo(pagos[0], contrato);
   } else {
     const nomeZip = nomeLote || `RECIBOS_LOTE_${pagos.length}_ARQUIVOS.zip`;
-    await baixarPdfRecibosZip(pagos, contrato, nomeZip);
+    return await baixarPdfRecibosZip(pagos, contrato, nomeZip);
   }
 }
 

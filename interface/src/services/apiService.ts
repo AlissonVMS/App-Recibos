@@ -1,4 +1,5 @@
 import { Beneficiary, ContractConfig, PaymentRecord } from '../types';
+import { salvarArquivoNativoOuWeb } from '../utils/fileSaver';
 
 const API_BASE = '/api';
 
@@ -170,15 +171,8 @@ export const apiService = {
       const res = await fetch(`${API_BASE}/recibos/${id}/pdf`);
       if (!res.ok) return false;
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = nomeArquivo || `recibo-${id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      return true;
+      const saveRes = await salvarArquivoNativoOuWeb(blob, nomeArquivo || `recibo-${id}.pdf`, 'pdf');
+      return saveRes.success;
     } catch {
       return false;
     }
@@ -193,15 +187,8 @@ export const apiService = {
       });
       if (!res.ok) return false;
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = nomeArquivo;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      return true;
+      const saveRes = await salvarArquivoNativoOuWeb(blob, nomeArquivo, 'zip');
+      return saveRes.success;
     } catch {
       return false;
     }
