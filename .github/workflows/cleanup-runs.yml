@@ -1,9 +1,6 @@
 name: Cleanup Workflow Runs and Storage
 
 on:
-  push:
-    paths:
-      - '.github/workflows/cleanup-runs.yml'
   workflow_dispatch:
 
 permissions:
