@@ -108,169 +108,148 @@ public class Program
                 var w = sender as PhotinoWindow ?? window;
                 if (w == null) return;
 
-                if (message == "request-save-csv")
+                // Executa completamente em Task.Run para liberar imediatamente a thread principal do GTK
+                Task.Run(async () =>
                 {
-                    var defaultFileName = $"CONTROLE_PAGAMENTOS_{DateTime.Now:yyyy-MM-dd}.csv";
-                    var filters = new (string, string[])[] { ("Planilha CSV (*.csv)", new[] { "csv" }), ("Todos os arquivos", new[] { "*" }) };
-                    
-                    var path = Services.NativeFileDialogService.ShowSaveFileDialog(
-                        w,
-                        "Salvar Planilha de Pagamentos CSV",
-                        lastSaveDir,
-                        defaultFileName,
-                        "csv",
-                        filters);
-                    
-                    if (string.IsNullOrWhiteSpace(path))
+                    string reqId = "";
+                    try
                     {
-                        w.SendWebMessage(JsonSerializer.Serialize(new { type = "save-cancelled" }));
-                        return;
-                    }
-
-                    if (!Path.HasExtension(path)) path += ".csv";
-                    var dir = Path.GetDirectoryName(path);
-                    if (!string.IsNullOrWhiteSpace(dir)) lastSaveDir = dir;
-
-                    Task.Run(async () => 
-                    {
-                        try
+                        if (message == "request-save-csv")
                         {
+                            var defaultFileName = $"CONTROLE_PAGAMENTOS_{DateTime.Now:yyyy-MM-dd}.csv";
+                            var filters = new (string, string[])[] { ("Planilha CSV (*.csv)", new[] { "csv" }), ("Todos os arquivos", new[] { "*" }) };
+                            
+                            var path = Services.NativeFileDialogService.ShowSaveFileDialog(
+                                w,
+                                "Salvar Planilha de Pagamentos CSV",
+                                lastSaveDir,
+                                defaultFileName,
+                                "csv",
+                                filters);
+                            
+                            if (string.IsNullOrWhiteSpace(path))
+                            {
+                                w.SendWebMessage(JsonSerializer.Serialize(new { type = "save-cancelled" }));
+                                return;
+                            }
+
+                            if (!Path.HasExtension(path)) path += ".csv";
+                            var dir = Path.GetDirectoryName(path);
+                            if (!string.IsNullOrWhiteSpace(dir)) lastSaveDir = dir;
+
                             var csvBytes = await httpClient.GetByteArrayAsync($"{targetUrl}/api/export/csv");
                             await File.WriteAllBytesAsync(path, csvBytes);
                             w.SendWebMessage(JsonSerializer.Serialize(new { type = "save-success", path = path, fileName = Path.GetFileName(path) }));
-                        }
-                        catch (Exception ex)
-                        {
-                            w.SendWebMessage(JsonSerializer.Serialize(new { type = "save-error", message = ex.Message }));
-                        }
-                    });
-                    return;
-                }
-
-                // Handler universal JSON para salvar arquivos (ZIP, PDF, CSV, etc.) com janela nativa do SO
-                if (!string.IsNullOrWhiteSpace(message) && message.TrimStart().StartsWith("{"))
-                {
-                    try
-                    {
-                        using var doc = JsonDocument.Parse(message);
-                        var root = doc.RootElement;
-                        if (!root.TryGetProperty("action", out var actionProp) || actionProp.GetString() != "save-file")
-                        {
                             return;
                         }
 
-                        var id = root.TryGetProperty("id", out var idProp) ? idProp.GetString() ?? "" : "";
-                        var fileName = root.TryGetProperty("fileName", out var fnProp) ? fnProp.GetString() ?? "arquivo" : "arquivo";
-                        var title = root.TryGetProperty("title", out var tProp) ? tProp.GetString() : null;
-                        var fileType = root.TryGetProperty("fileType", out var ftProp) ? ftProp.GetString()?.ToLowerInvariant() : null;
-                        var base64 = root.TryGetProperty("base64", out var b64Prop) ? b64Prop.GetString() : null;
-                        var url = root.TryGetProperty("url", out var uProp) ? uProp.GetString() : null;
-                        bool hasPostData = root.TryGetProperty("postData", out var postDataProp);
-                        string? postDataJson = hasPostData ? postDataProp.GetRawText() : null;
-
-                        var ext = Path.GetExtension(fileName).TrimStart('.').ToLowerInvariant();
-                        if (string.IsNullOrEmpty(ext))
+                        // Handler universal JSON para salvar arquivos (ZIP, PDF, CSV, etc.) com janela nativa do SO
+                        if (!string.IsNullOrWhiteSpace(message) && message.TrimStart().StartsWith("{"))
                         {
-                            ext = fileType switch
+                            using var doc = JsonDocument.Parse(message);
+                            var root = doc.RootElement;
+                            if (!root.TryGetProperty("action", out var actionProp) || actionProp.GetString() != "save-file")
                             {
-                                "zip" => "zip",
-                                "pdf" => "pdf",
-                                "csv" => "csv",
-                                _ => "dat"
+                                return;
+                            }
+
+                            var id = root.TryGetProperty("id", out var idProp) ? idProp.GetString() ?? "" : "";
+                            reqId = id;
+                            var fileName = root.TryGetProperty("fileName", out var fnProp) ? fnProp.GetString() ?? "arquivo" : "arquivo";
+                            var title = root.TryGetProperty("title", out var tProp) ? tProp.GetString() : null;
+                            var fileType = root.TryGetProperty("fileType", out var ftProp) ? ftProp.GetString()?.ToLowerInvariant() : null;
+                            var base64 = root.TryGetProperty("base64", out var b64Prop) ? b64Prop.GetString() : null;
+                            var url = root.TryGetProperty("url", out var uProp) ? uProp.GetString() : null;
+                            bool hasPostData = root.TryGetProperty("postData", out var postDataProp);
+                            string? postDataJson = hasPostData ? postDataProp.GetRawText() : null;
+
+                            var ext = Path.GetExtension(fileName).TrimStart('.').ToLowerInvariant();
+                            if (string.IsNullOrEmpty(ext))
+                            {
+                                ext = fileType switch
+                                {
+                                    "zip" => "zip",
+                                    "pdf" => "pdf",
+                                    "csv" => "csv",
+                                    _ => "dat"
+                                };
+                                fileName += "." + ext;
+                            }
+
+                            var dialogTitle = title ?? ext switch
+                            {
+                                "zip" => "Salvar Pacote de Recibos em ZIP",
+                                "pdf" => "Salvar Recibo em PDF",
+                                "csv" => "Salvar Planilha de Pagamentos CSV",
+                                _ => "Salvar Arquivo"
                             };
-                            fileName += "." + ext;
-                        }
 
-                        var dialogTitle = title ?? ext switch
-                        {
-                            "zip" => "Salvar Pacote de Recibos em ZIP",
-                            "pdf" => "Salvar Recibo em PDF",
-                            "csv" => "Salvar Planilha de Pagamentos CSV",
-                            _ => "Salvar Arquivo"
-                        };
-
-                        (string, string[])[] filters = ext switch
-                        {
-                            "zip" => new (string, string[])[] { ("Arquivo ZIP (*.zip)", new[] { "zip" }), ("Todos os arquivos", new[] { "*" }) },
-                            "pdf" => new (string, string[])[] { ("Documento PDF (*.pdf)", new[] { "pdf" }), ("Todos os arquivos", new[] { "*" }) },
-                            "csv" => new (string, string[])[] { ("Planilha CSV (*.csv)", new[] { "csv" }), ("Todos os arquivos", new[] { "*" }) },
-                            _ => new (string, string[])[] { ($"Arquivo (*.{ext})", new[] { ext }), ("Todos os arquivos", new[] { "*" }) }
-                        };
-
-                        // Executa diálogo nativo desacoplado e confiável
-                        var selectedPath = Services.NativeFileDialogService.ShowSaveFileDialog(
-                            w,
-                            dialogTitle,
-                            lastSaveDir,
-                            fileName,
-                            ext,
-                            filters);
-
-                        if (string.IsNullOrWhiteSpace(selectedPath))
-                        {
-                            // Usuário cancelou ou fechou a janela
-                            w.SendWebMessage(JsonSerializer.Serialize(new { type = "save-cancelled", id }));
-                            return;
-                        }
-
-                        if (!Path.HasExtension(selectedPath) && !string.IsNullOrEmpty(ext))
-                        {
-                            selectedPath += "." + ext;
-                        }
-
-                        var dir = Path.GetDirectoryName(selectedPath);
-                        if (!string.IsNullOrWhiteSpace(dir)) lastSaveDir = dir;
-
-                        // Gravação em disco e requisição assíncrona desacopladas da UI
-                        Task.Run(async () =>
-                        {
-                            try
+                            (string, string[])[] filters = ext switch
                             {
-                                byte[] fileBytes;
-                                if (!string.IsNullOrEmpty(url))
+                                "zip" => new (string, string[])[] { ("Arquivo ZIP (*.zip)", new[] { "zip" }), ("Todos os arquivos", new[] { "*" }) },
+                                "pdf" => new (string, string[])[] { ("Documento PDF (*.pdf)", new[] { "pdf" }), ("Todos os arquivos", new[] { "*" }) },
+                                "csv" => new (string, string[])[] { ("Planilha CSV (*.csv)", new[] { "csv" }), ("Todos os arquivos", new[] { "*" }) },
+                                _ => new (string, string[])[] { ($"Arquivo (*.{ext})", new[] { ext }), ("Todos os arquivos", new[] { "*" }) }
+                            };
+
+                            // Executa diálogo nativo desacoplado na thread background (evita deadlock com o loop GTK)
+                            var selectedPath = Services.NativeFileDialogService.ShowSaveFileDialog(
+                                w,
+                                dialogTitle,
+                                lastSaveDir,
+                                fileName,
+                                ext,
+                                filters);
+
+                            if (string.IsNullOrWhiteSpace(selectedPath))
+                            {
+                                // Usuário cancelou ou fechou a janela
+                                w.SendWebMessage(JsonSerializer.Serialize(new { type = "save-cancelled", id }));
+                                return;
+                            }
+
+                            if (!Path.HasExtension(selectedPath) && !string.IsNullOrEmpty(ext))
+                            {
+                                selectedPath += "." + ext;
+                            }
+
+                            var dir = Path.GetDirectoryName(selectedPath);
+                            if (!string.IsNullOrWhiteSpace(dir)) lastSaveDir = dir;
+
+                            byte[] fileBytes;
+                            if (!string.IsNullOrEmpty(url))
+                            {
+                                var fullUrl = url.StartsWith("http") ? url : $"{targetUrl}{url}";
+                                if (!string.IsNullOrEmpty(postDataJson))
                                 {
-                                    var fullUrl = url.StartsWith("http") ? url : $"{targetUrl}{url}";
-                                    if (!string.IsNullOrEmpty(postDataJson))
-                                    {
-                                        using var content = new StringContent(postDataJson, System.Text.Encoding.UTF8, "application/json");
-                                        var resp = await httpClient.PostAsync(fullUrl, content);
-                                        resp.EnsureSuccessStatusCode();
-                                        fileBytes = await resp.Content.ReadAsByteArrayAsync();
-                                    }
-                                    else
-                                    {
-                                        fileBytes = await httpClient.GetByteArrayAsync(fullUrl);
-                                    }
-                                }
-                                else if (!string.IsNullOrEmpty(base64))
-                                {
-                                    fileBytes = Convert.FromBase64String(base64);
+                                    using var content = new StringContent(postDataJson, System.Text.Encoding.UTF8, "application/json");
+                                    var resp = await httpClient.PostAsync(fullUrl, content);
+                                    resp.EnsureSuccessStatusCode();
+                                    fileBytes = await resp.Content.ReadAsByteArrayAsync();
                                 }
                                 else
                                 {
-                                    throw new InvalidOperationException("Nenhum dado binário (base64 ou url) fornecido.");
+                                    fileBytes = await httpClient.GetByteArrayAsync(fullUrl);
                                 }
-
-                                await File.WriteAllBytesAsync(selectedPath, fileBytes);
-                                w.SendWebMessage(JsonSerializer.Serialize(new 
-                                { 
-                                    type = "save-success", 
-                                    id, 
-                                    path = selectedPath, 
-                                    fileName = Path.GetFileName(selectedPath) 
-                                }));
                             }
-                            catch (Exception ex)
+                            else if (!string.IsNullOrEmpty(base64))
                             {
-                                Console.WriteLine($"[AppRecibos Desktop] Erro ao gravar arquivo: {ex.Message}");
-                                w.SendWebMessage(JsonSerializer.Serialize(new 
-                                { 
-                                    type = "save-error", 
-                                    id, 
-                                    message = ex.Message 
-                                }));
+                                fileBytes = Convert.FromBase64String(base64);
                             }
-                        });
+                            else
+                            {
+                                throw new InvalidOperationException("Nenhum dado binário (base64 ou url) fornecido.");
+                            }
+
+                            await File.WriteAllBytesAsync(selectedPath, fileBytes);
+                            w.SendWebMessage(JsonSerializer.Serialize(new 
+                            { 
+                                type = "save-success", 
+                                id, 
+                                path = selectedPath, 
+                                fileName = Path.GetFileName(selectedPath) 
+                            }));
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -278,10 +257,11 @@ public class Program
                         w.SendWebMessage(JsonSerializer.Serialize(new 
                         { 
                             type = "save-error", 
+                            id = reqId,
                             message = ex.Message 
                         }));
                     }
-                }
+                });
             });
 
             window.Load(targetUrl);

@@ -462,6 +462,74 @@ export function App() {
     setIsBatchPreviewModalOpen(true);
   };
 
+  // Download direto (sem abrir tela de conferência)
+  const [downloadingRowId, setDownloadingRowId] = useState<string | null>(null);
+  const [isDownloadingBatchZip, setIsDownloadingBatchZip] = useState<boolean>(false);
+
+  const handleDirectDownloadPdf = async (p: PaymentRecord) => {
+    if (downloadingRowId) return;
+    const runDownload = async (pay: PaymentRecord) => {
+      setDownloadingRowId(pay.id);
+      try {
+        await baixarPdfRecibo(pay, contract);
+      } catch (err) {
+        console.error('Erro ao baixar recibo:', err);
+        showToast('error', 'Erro ao Baixar', 'Não foi possível gerar o PDF do recibo.');
+      } finally {
+        setDownloadingRowId(null);
+      }
+    };
+
+    if (isPrevisto(p.status)) {
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Parcela com Status PREVISTO',
+        message: `A parcela nº ${p.parcela} de ${p.nome} está registrada como PREVISTO. Deseja registrar a quitação desta parcela agora para gerar o PDF oficial?`,
+        details: [
+          { label: 'Beneficiário (Cedente)', value: p.nome },
+          { label: 'Identificação', value: `Parcela nº ${p.parcela}` },
+          { label: 'Valor da Parcela', value: formatarMoeda(p.valor) },
+        ],
+        subMessage:
+          'Recibos oficiais de quitação plena exigem que a parcela esteja com status PAGO. Ao confirmar, o pagamento será liquidado e você escolherá onde salvar o PDF.',
+        confirmLabel: 'Quitar e Baixar PDF',
+        confirmVariant: 'emerald',
+        onConfirm: async () => {
+          executeMarkAsPaid(p.id);
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+          await runDownload({ ...p, status: 'PAGO' as const });
+        },
+      });
+      return;
+    }
+    await runDownload(p);
+  };
+
+  const handleDirectDownloadZip = async () => {
+    if (isDownloadingBatchZip) return;
+    if (paidPaymentsForEmission.length === 0) {
+      showToast('warning', 'Nenhuma Parcela Paga', 'Nenhuma parcela com status PAGO selecionada.');
+      return;
+    }
+    setIsDownloadingBatchZip(true);
+    try {
+      if (paidPaymentsForEmission.length === 1) {
+        await baixarPdfRecibo(paidPaymentsForEmission[0], contract);
+      } else {
+        await baixarPdfRecibosZip(
+          paidPaymentsForEmission,
+          contract,
+          gerarNomeArquivoLote(paidPaymentsForEmission)
+        );
+      }
+    } catch (err) {
+      console.error('Erro ao baixar ZIP:', err);
+      showToast('error', 'Erro ao Baixar', 'Não foi possível gerar o pacote de recibos.');
+    } finally {
+      setIsDownloadingBatchZip(false);
+    }
+  };
+
   // Selected payment for individual receipt view
   const currentReceiptPayment =
     payments.find((p) => p.id === selectedReceiptPaymentId) || payments[0];
@@ -1474,12 +1542,45 @@ export function App() {
                     {selectedPaidTablePayments.length > 0 && (
                       <button
                         type="button"
-                        onClick={handleOpenReceiptsPreview}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-md transition-all cursor-pointer whitespace-nowrap active:scale-95 ring-2 ring-blue-400/30"
-                        title="Conferir previamente e emitir recibos das parcelas pagas selecionadas"
+                        disabled={isDownloadingBatchZip}
+                        onClick={handleDirectDownloadZip}
+                        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white rounded-lg shadow-md transition-all whitespace-nowrap ring-2 ring-blue-400/30 ${
+                          isDownloadingBatchZip
+                            ? 'bg-blue-400 cursor-wait'
+                            : 'bg-blue-600 hover:bg-blue-500 cursor-pointer active:scale-95'
+                        }`}
+                        title={
+                          selectedPaidTablePayments.length === 1
+                            ? `Baixar PDF: ${gerarNomeArquivoRecibo(selectedPaidTablePayments[0])}`
+                            : `Baixar ZIP: ${gerarNomeArquivoLote(selectedPaidTablePayments)}`
+                        }
                       >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Emitir Recibo(s) ({selectedPaidTablePayments.length})</span>
+                        {isDownloadingBatchZip ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : selectedPaidTablePayments.length === 1 ? (
+                          <Download className="w-3.5 h-3.5" />
+                        ) : (
+                          <Archive className="w-3.5 h-3.5" />
+                        )}
+                        <span>
+                          {isDownloadingBatchZip
+                            ? 'Salvando...'
+                            : selectedPaidTablePayments.length === 1
+                            ? 'Baixar PDF (1)'
+                            : `Baixar ZIP (${selectedPaidTablePayments.length})`}
+                        </span>
+                      </button>
+                    )}
+
+                    {selectedPaidTablePayments.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleOpenReceiptsPreview}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-100 bg-slate-800/80 hover:bg-slate-700/80 border border-blue-500/40 rounded-lg shadow-sm transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                        title="Conferir previamente os recibos das parcelas pagas selecionadas"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Conferir ({selectedPaidTablePayments.length})</span>
                       </button>
                     )}
 
@@ -1853,17 +1954,43 @@ export function App() {
                                   </button>
                                 )}
 
-                                {/* Opção UNIFICADA de Recibo: Exibir Recibo (Conferência obrigatória antes da emissão/download) */}
+                                {/* Download direto do PDF (abre a janela do sistema para escolher onde salvar) */}
                                 <button
+                                  type="button"
+                                  disabled={downloadingRowId !== null}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDirectDownloadPdf(p);
+                                  }}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white rounded-lg transition-colors shadow-2xs ${
+                                    downloadingRowId === p.id
+                                      ? 'bg-blue-400 cursor-wait'
+                                      : downloadingRowId !== null
+                                      ? 'bg-blue-300 cursor-not-allowed'
+                                      : 'bg-blue-600 hover:bg-blue-700 cursor-pointer'
+                                  }`}
+                                  title={`Baixar PDF: ${gerarNomeArquivoRecibo(p)}`}
+                                >
+                                  {downloadingRowId === p.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Download className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>{downloadingRowId === p.id ? 'Salvando...' : 'Baixar PDF'}</span>
+                                </button>
+
+                                {/* Visualizar recibo em tela cheia (conferência / impressão) */}
+                                <button
+                                  type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setViewingReceiptPayment(p);
                                   }}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/90 rounded-lg transition-colors shadow-2xs"
-                                  title="Exibir Recibo Oficial (Conferência prévia obrigatória antes de baixar ou imprimir)"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/90 rounded-lg transition-colors shadow-2xs cursor-pointer"
+                                  title="Visualizar recibo para conferência ou impressão"
                                 >
-                                  <FileText className="w-3.5 h-3.5 text-blue-600" />
-                                  <span>Exibir Recibo</span>
+                                  <Eye className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Visualizar</span>
                                 </button>
 
                                 {/* Editar */}
