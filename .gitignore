@@ -53,3 +53,12 @@ docs/.vitepress/cache
 
 # AI Agent configuration
 .agent.md
+
+# Planilhas e Documentos locais / sensíveis
+CONTROLE PAGAMENTOS.xlsx
+RECIBO SIMPLES.docm
+*.xlsx
+*.docm
+*.db
+Comp/
+

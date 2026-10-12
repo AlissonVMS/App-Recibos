@@ -10,9 +10,19 @@ export const MESES_PT = [
 
 export function normalizarPagamento(p: any): PaymentRecord {
   const dataRef = p.dataPagamento || p.dataPrevista || p.data || '';
-  let dia = p.dia;
-  let mes = p.mes;
-  let ano = p.ano;
+  let dia = p.dia ? String(p.dia).padStart(2, '0') : '';
+  let mes = p.mes ? String(p.mes).trim() : '';
+  let ano = p.ano ? String(p.ano).trim() : '';
+
+  // Se o mês for puramente numérico ou resíduo (ex: "30000"), converter ou limpar
+  if (mes && !isNaN(Number(mes))) {
+    const mesNum = parseInt(mes, 10);
+    if (mesNum >= 1 && mesNum <= 12) {
+      mes = MESES_PT[mesNum - 1];
+    } else {
+      mes = '';
+    }
+  }
 
   if ((!dia || !mes || !ano) && dataRef && dataRef.includes('-')) {
     const parts = dataRef.split('-');
@@ -24,6 +34,10 @@ export function normalizarPagamento(p: any): PaymentRecord {
       }
       dia = dia || parts[2].padStart(2, '0');
     }
+  }
+
+  if (mes && isNaN(Number(mes))) {
+    mes = mes.charAt(0).toUpperCase() + mes.slice(1).toLowerCase();
   }
 
   return {

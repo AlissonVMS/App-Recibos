@@ -40,18 +40,20 @@ public class ExcelSyncTests
             beneficiarios.Should().HaveCount(3);
             pagamentos.Should().HaveCount(54);
 
-            // 3. Atualizar Parcela 14 de ELIANE para PAGO
-            var parcela14Eliane = pagamentos.First(p => p.BeneficiarioNome == "ELIANE MARIA DA SILVA" && p.ParcelaNumero == 14);
-            parcela14Eliane.Status.Should().Be(StatusParcela.Previsto);
+            // 3. Atualizar Parcela 15 de ELIANE para PAGO (pois 1 a 14 já estão quitadas)
+            var parcela15Eliane = pagamentos.First(p => p.BeneficiarioNome == "ELIANE MARIA DA SILVA" && p.ParcelaNumero == 15);
+            parcela15Eliane.Status.Should().Be(StatusParcela.Previsto);
+            parcela15Eliane.DataPagamento.Should().BeNull();
+            parcela15Eliane.DataPrevista.Should().Be("2026-11-10");
 
-            var parcela14Quitada = parcela14Eliane with
+            var parcela15Quitada = parcela15Eliane with
             {
                 Status = StatusParcela.Pago,
                 Valor = 1000m,
-                DataPagamento = "2026-10-10"
+                DataPagamento = "2026-11-10"
             };
 
-            var updateResult = await _engine.AtualizarParcelaNaPlanilhaAsync(tempFile, parcela14Quitada);
+            var updateResult = await _engine.AtualizarParcelaNaPlanilhaAsync(tempFile, parcela15Quitada);
             updateResult.IsSuccess.Should().BeTrue();
 
             // 4. Re-ler e verificar persistência na planilha
@@ -63,24 +65,24 @@ public class ExcelSyncTests
             reReadResult.IsSuccess.Should().BeTrue();
             var rePagamentos = reReadResult.Value.Pagamentos;
 
-            var conferida = rePagamentos.First(p => p.BeneficiarioNome == "ELIANE MARIA DA SILVA" && p.ParcelaNumero == 14);
+            var conferida = rePagamentos.First(p => p.BeneficiarioNome == "ELIANE MARIA DA SILVA" && p.ParcelaNumero == 15);
             conferida.Status.Should().Be(StatusParcela.Pago);
             conferida.Valor.Should().Be(1000m);
-            conferida.DataPagamento.Should().Be("2026-10-10");
+            conferida.DataPagamento.Should().Be("2026-11-10");
 
             // 5. Reverter para PREVISTO
-            var parcela14Revertida = conferida with
+            var parcela15Revertida = conferida with
             {
                 Status = StatusParcela.Previsto,
                 DataPagamento = null
             };
-            var revertResult = await _engine.AtualizarParcelaNaPlanilhaAsync(tempFile, parcela14Revertida);
+            var revertResult = await _engine.AtualizarParcelaNaPlanilhaAsync(tempFile, parcela15Revertida);
             revertResult.IsSuccess.Should().BeTrue();
 
             // 6. Conferir que reverteu para PREVISTO
             var checkRevert = await _engine.LerPlanilhaAsync(tempFile);
             checkRevert.IsSuccess.Should().BeTrue();
-            var parcelaRevertidaLida = checkRevert.Value.Pagamentos.First(p => p.BeneficiarioNome == "ELIANE MARIA DA SILVA" && p.ParcelaNumero == 14);
+            var parcelaRevertidaLida = checkRevert.Value.Pagamentos.First(p => p.BeneficiarioNome == "ELIANE MARIA DA SILVA" && p.ParcelaNumero == 15);
             parcelaRevertidaLida.Status.Should().Be(StatusParcela.Previsto);
             parcelaRevertidaLida.DataPagamento.Should().BeNull();
         }
@@ -115,11 +117,82 @@ public class ExcelSyncTests
 
             var pags = await pagRepo.GetAllAsync();
             pags.Should().HaveCount(54);
+
+            var pagos = pags.Count(p => p.Status == StatusParcela.Pago);
+            var previstos = pags.Count(p => p.Status == StatusParcela.Previsto);
+            pagos.Should().Be(42);
+            previstos.Should().Be(12);
+
+            // Nenhuma parcela pode ter mes numérico ou 30000
+            pags.Should().OnlyContain(p => !string.IsNullOrEmpty(p.Mes) && !char.IsDigit(p.Mes[0]));
         }
         finally
         {
             if (File.Exists(dbPath))
                 File.Delete(dbPath);
         }
+    }
+
+    [Fact]
+    public async Task LerPlanilhaRealOneDrive_DeveCarregarComSucesso()
+    {
+        var realPath = "/home/alisson/Documentos/OneDrive/Documentos/##docs herança irmãos/CONTROLE PAGAMENTOS.xlsx";
+        if (!File.Exists(realPath)) return;
+
+        var result = await _engine.LerPlanilhaAsync(realPath);
+        result.IsSuccess.Should().BeTrue();
+        var (beneficiarios, pagamentos) = result.Value;
+        beneficiarios.Should().HaveCount(3);
+        pagamentos.Should().HaveCount(54);
+
+        var pagos = pagamentos.Count(p => p.Status == StatusParcela.Pago);
+        var previstos = pagamentos.Count(p => p.Status == StatusParcela.Previsto);
+        pagos.Should().Be(42);
+        previstos.Should().Be(12);
+
+        // Verificar que parcelas 1 a 14 estão pagas e com data de pagamento
+        pagamentos.Where(p => p.ParcelaNumero <= 14).Should().OnlyContain(p => p.Status == StatusParcela.Pago && !string.IsNullOrEmpty(p.DataPagamento));
+
+        // Verificar que parcelas 15 a 18 são previstas com dia 10 e sem data de pagamento
+        var parcelasPrevistas = pagamentos.Where(p => p.ParcelaNumero >= 15).ToList();
+        parcelasPrevistas.Should().OnlyContain(p => p.Status == StatusParcela.Previsto && p.DataPagamento == null);
+        parcelasPrevistas.Should().OnlyContain(p => p.DataPrevista != null && p.DataPrevista.EndsWith("-10"));
+
+        // Verificar que mes nunca é numérico (ex: "30000")
+        pagamentos.Should().OnlyContain(p => !string.IsNullOrEmpty(p.Mes) && !char.IsDigit(p.Mes[0]));
+    }
+
+    [Fact]
+    public async Task SincronizarBancoRealDoUsuarioSeExistir()
+    {
+        var dbPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "app-recibos",
+            "recibos.db"
+        );
+        if (!File.Exists(dbPath)) return;
+
+        var realExcel = "/home/alisson/Documentos/OneDrive/Documentos/##docs herança irmãos/CONTROLE PAGAMENTOS.xlsx";
+        if (!File.Exists(realExcel)) return;
+
+        var factory = new AppRecibos.Core.Infrastructure.Data.SqliteDbConnectionFactory(dbPath);
+        factory.InitializeDatabase();
+        var benRepo = new AppRecibos.Core.Infrastructure.Data.Repositories.BeneficiarioRepository(factory);
+        var pagRepo = new AppRecibos.Core.Infrastructure.Data.Repositories.PagamentoRepository(factory);
+        var syncService = new AppRecibos.Core.Services.SyncService(_engine, benRepo, pagRepo);
+
+        var res = await syncService.ImportarPlanilhaParaBancoAsync(realExcel);
+        res.IsSuccess.Should().BeTrue();
+        res.Value.BeneficiariosImportados.Should().Be(3);
+        res.Value.PagamentosImportados.Should().Be(54);
+
+        var pags = await pagRepo.GetAllAsync();
+        var pagos = pags.Count(p => p.Status == StatusParcela.Pago);
+        var previstos = pags.Count(p => p.Status == StatusParcela.Previsto);
+        pagos.Should().Be(42);
+        previstos.Should().Be(12);
+
+        // Nenhuma parcela no banco pode ter mes numérico ou resíduo
+        pags.Should().OnlyContain(p => !string.IsNullOrEmpty(p.Mes) && !char.IsDigit(p.Mes[0]));
     }
 }

@@ -36,22 +36,23 @@ public class Program
             return;
         }
 
-        // 2. Aguarda a API subir respondendo no healthcheck
-        var httpClient = new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
-        for (int i = 0; i < 20; i++)
+        // 2. Aguarda a API subir respondendo no healthcheck (polling ágil de 20ms para inicialização instantânea)
+        var httpClient = new HttpClient { Timeout = TimeSpan.FromMilliseconds(300) };
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < 10000)
         {
             try
             {
                 var res = httpClient.GetAsync("http://127.0.0.1:5000/api/health").GetAwaiter().GetResult();
                 if (res.IsSuccessStatusCode)
                 {
-                    Console.WriteLine("[App-Recibos Desktop] Backend conectado com sucesso na porta 5000.");
+                    Console.WriteLine($"[App-Recibos Desktop] Backend conectado com sucesso na porta 5000 ({sw.ElapsedMilliseconds}ms).");
                     break;
                 }
             }
             catch
             {
-                Thread.Sleep(250);
+                Thread.Sleep(20);
             }
         }
 

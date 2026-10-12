@@ -30,23 +30,22 @@ Contém a tabela estruturada `PARCELAS` (colunas A a O) e a tabela auxiliar de m
 | **A** | `NOME` | Texto do beneficiário |
 | **B** | `CPF` | `=IFERROR(INDEX(GERAL[CPF],MATCH(PARCELAS[[#This Row],[NOME]],GERAL[NOME],0)),"-")` |
 | **C** | `PARCELA` | `=COUNTIF(PARCELAS[[#Headers],[NOME]]:PARCELAS[[#This Row],[NOME]],PARCELAS[[#This Row],[NOME]])` |
-| **D** | `STATUS` | `PAGO` ou `PREVISTO` |
+| **D** | `STATUS` | `=IF(PARCELAS[[#This Row],[DATA PAGAMENTO]]<>"","PAGO","PREVISTO")` |
 | **E** | `VALOR` | Valor da parcela (ex: `1000.00` ou `500.00`) |
-| **F** | `DATA PREVISTA` | Data agendada da parcela no formato de data do Excel |
-| **G** | `DATA PAGAMENTO` | Data de quitação efetiva (preenchida apenas quando `STATUS` for `PAGO`) |
+| **F** | `DATA PREVISTA` | Data agendada/prevista da parcela (dia 10 do mês para parcelas futuras) |
+| **G** | `DATA PAGAMENTO` | Data de quitação efetiva (preenchida apenas quando o pagamento foi realizado) |
 | **H** | `FORMA PGTO` | `PIX`, `TED`, `TEV` ou `ESPÉCIE` |
 | **I** | `CHAVE PIX` | `=IFERROR(INDEX(GERAL[PIX],MATCH(PARCELAS[[#This Row],[NOME]],GERAL[NOME],0)),"-")` |
 | **J** | `BANCO` | `=IFERROR(INDEX(GERAL[BANCO],MATCH(PARCELAS[[#This Row],[NOME]],GERAL[NOME],0)),"-")` |
 | **K** | `SALDO DEVEDOR`| Fórmula dinâmica de amortização progressiva |
-| **L** | `DIA` | `=IF(OR(ISBLANK(...), DAY(...)=0), "", TEXT(DAY(...), "00"))` |
-| **M** | `MÊS` | `=IF(ISBLANK(...), "", INDEX(MESES[MÊS], MATCH(MONTH(...), MESES[N], 0)))` |
-| **N** | `ANO` | `=IF(OR(ISBLANK(...), YEAR(...)=1900), "", YEAR(...))` |
+| **L** | `DIA` | `=IF(OR(ISBLANK(PARCELAS[[#This Row],[DATA PAGAMENTO]]),DAY(PARCELAS[[#This Row],[DATA PAGAMENTO]])=0),"",TEXT(DAY(PARCELAS[[#This Row],[DATA PAGAMENTO]]),"00"))` |
+| **M** | `MÊS` | `=IF(ISBLANK(PARCELAS[[#This Row],[DATA PAGAMENTO]]),"",TEXT(PARCELAS[[#This Row],[DATA PAGAMENTO]],"mmmm"))` |
+| **N** | `ANO` | `=IF(OR(ISBLANK(PARCELAS[[#This Row],[DATA PAGAMENTO]]),YEAR(PARCELAS[[#This Row],[DATA PAGAMENTO]])=1900),"",YEAR(PARCELAS[[#This Row],[DATA PAGAMENTO]]))` |
 | **O** | `CIDADE / UF` | `Maceió - AL` ou `Barra de São Miguel - AL` |
 
-## Tabela Auxiliar: `MESES` (Colunas Q e R)
-Para desobstruir a linha de visualização principal e garantir compatibilidade com versões antigas do Excel que não suportam a função `TEXT(data, "mmmm")` em português, a tabela `MESES` foi alocada no intervalo `Q1:R13`:
-- Coluna Q (`N`): 1 a 12
-- Coluna R (`MÊS`): janeiro, fevereiro, março, ..., dezembro
+## Fórmula Nativa de Mês e Remoção da Tabela `MESES`
+Com a fórmula nativa moderna do Excel 365 `=TEXT([@[DATA PAGAMENTO]], "mmmm")`, a coluna `MÊS` obtém o nome completo do mês em português diretamente a partir da data de quitação.
+Isso eliminou a necessidade de qualquer tabela auxiliar `MESES` (anteriormente nas colunas Q e R), tornando a planilha mais limpa, leve e sem dependências externas.
 
 ## Proteção Contra Corrupção de Gráfico (`chart1.xml`)
 Ao salvar a pasta de trabalho com o **ClosedXML**:

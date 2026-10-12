@@ -77,20 +77,20 @@ public class ExcelSyncEngine
             int benIndex = 1;
             foreach (var row in tabelaGeral.DataRange.Rows())
             {
-                var nome = GetStringValue(row.Cell(gCols["NOME"]));
+                var nome = gCols.TryGetValue("NOME", out var cNome) ? GetStringValue(row.Cell(cNome)) : "";
                 if (string.IsNullOrWhiteSpace(nome)) continue;
 
-                var cpf = GetStringValue(row.Cell(gCols["CPF"]));
-                var contrato = GetDecimalValue(row.Cell(gCols["CONTRATO"]));
-                var pago = GetDecimalValue(row.Cell(gCols["PAGO"]));
-                var saldo = GetDecimalValue(row.Cell(gCols["SALDO"]));
-                var status = GetStringValue(row.Cell(gCols["STATUS"]));
-                var banco = GetStringValue(row.Cell(gCols["BANCO"]));
-                var ag = GetStringValue(row.Cell(gCols["AG"]));
-                var conta = GetStringValue(row.Cell(gCols["CONTA"]));
-                var op = GetStringValue(row.Cell(gCols["OP"]));
-                var tipoConta = GetStringValue(row.Cell(gCols["TIPO"]));
-                var pix = GetStringValue(row.Cell(gCols["PIX"]));
+                var cpf = gCols.TryGetValue("CPF", out var cCpf) ? GetStringValue(row.Cell(cCpf)) : "";
+                var contrato = gCols.TryGetValue("CONTRATO", out var cContrato) ? GetDecimalValue(row.Cell(cContrato)) : 30000m;
+                var pago = gCols.TryGetValue("PAGO", out var cPago) ? GetDecimalValue(row.Cell(cPago)) : 0m;
+                var saldo = gCols.TryGetValue("SALDO", out var cSaldo) ? GetDecimalValue(row.Cell(cSaldo)) : Math.Max(0m, contrato - pago);
+                var status = gCols.TryGetValue("STATUS", out var cStatus) ? GetStringValue(row.Cell(cStatus)) : "EM ABERTO";
+                var banco = gCols.TryGetValue("BANCO", out var cBanco) ? GetStringValue(row.Cell(cBanco)) : "";
+                var ag = gCols.TryGetValue("AG", out var cAg) ? GetStringValue(row.Cell(cAg)) : "";
+                var conta = gCols.TryGetValue("CONTA", out var cConta) ? GetStringValue(row.Cell(cConta)) : "";
+                var op = gCols.TryGetValue("OP", out var cOp) ? GetStringValue(row.Cell(cOp)) : "";
+                var tipoConta = gCols.TryGetValue("TIPO", out var cTipo) ? GetStringValue(row.Cell(cTipo)) : "POUPANÇA";
+                var pix = gCols.TryGetValue("PIX", out var cPix) ? GetStringValue(row.Cell(cPix)) : "";
 
                 beneficiarios.Add(new Beneficiario
                 {
@@ -123,72 +123,120 @@ public class ExcelSyncEngine
 
             foreach (var row in tabelaParcelas.DataRange.Rows())
             {
-                var nome = GetStringValue(row.Cell(pCols["NOME"]));
+                int colNome = pCols.GetValueOrDefault("NOME", 1);
+                var nome = GetStringValue(row.Cell(colNome));
                 if (string.IsNullOrWhiteSpace(nome)) continue;
 
                 parcelaCounters[nome] = parcelaCounters.GetValueOrDefault(nome, 0) + 1;
-                var numParcela = (int)GetDecimalValue(row.Cell(pCols["PARCELA"]));
+                int colParcela = pCols.GetValueOrDefault("PARCELA", 3);
+                var numParcela = (int)GetDecimalValue(row.Cell(colParcela));
                 if (numParcela <= 0)
                 {
                     numParcela = parcelaCounters[nome];
                 }
 
-                var statusStr = GetStringValue(row.Cell(pCols["STATUS"]));
-                var status = string.Equals(statusStr, "PAGO", StringComparison.OrdinalIgnoreCase) 
-                    ? StatusParcela.Pago 
-                    : StatusParcela.Previsto;
+                int colValor = pCols.GetValueOrDefault("VALOR", 4);
+                var valor = GetDecimalValue(row.Cell(colValor));
 
-                var valor = GetDecimalValue(row.Cell(pCols["VALOR"]));
-                
+                // Data de pagamento: na planilha original se chama "DATA", em outras pode ser "DATA PAGAMENTO"
+                int colDataPag = 0;
+                if (pCols.TryGetValue("DATA", out var cd)) colDataPag = cd;
+                else if (pCols.TryGetValue("DATA PAGAMENTO", out var cdp)) colDataPag = cdp;
+
                 string? dataPagamento = null;
-                var cellDataPag = row.Cell(pCols["DATA PAGAMENTO"]);
-                if (!cellDataPag.IsEmpty())
+                if (colDataPag > 0)
                 {
-                    if (cellDataPag.DataType == XLDataType.DateTime)
-                        dataPagamento = cellDataPag.GetDateTime().ToString("yyyy-MM-dd");
-                    else if (cellDataPag.DataType == XLDataType.Number)
-                        dataPagamento = DateTime.FromOADate(cellDataPag.GetDouble()).ToString("yyyy-MM-dd");
-                    else
+                    var cellDataPag = row.Cell(colDataPag);
+                    if (!cellDataPag.IsEmpty())
                     {
-                        var str = cellDataPag.GetString().Trim();
-                        if (DateTime.TryParse(str, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dtParsed))
-                            dataPagamento = dtParsed.ToString("yyyy-MM-dd");
-                        else if (DateTime.TryParse(str, new CultureInfo("pt-BR"), DateTimeStyles.None, out var dtParsedPt))
-                            dataPagamento = dtParsedPt.ToString("yyyy-MM-dd");
+                        if (cellDataPag.DataType == XLDataType.DateTime)
+                            dataPagamento = cellDataPag.GetDateTime().ToString("yyyy-MM-dd");
+                        else if (cellDataPag.DataType == XLDataType.Number)
+                        {
+                            var num = cellDataPag.GetDouble();
+                            if (num > 30000 && num < 70000) // Data serial Excel válida (~1982 a ~2091)
+                                dataPagamento = DateTime.FromOADate(num).ToString("yyyy-MM-dd");
+                        }
+                        else
+                        {
+                            var str = cellDataPag.GetString().Trim();
+                            if (DateTime.TryParse(str, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dtParsed))
+                                dataPagamento = dtParsed.ToString("yyyy-MM-dd");
+                            else if (DateTime.TryParse(str, new CultureInfo("pt-BR"), DateTimeStyles.None, out var dtParsedPt))
+                                dataPagamento = dtParsedPt.ToString("yyyy-MM-dd");
+                        }
                     }
                 }
 
-                string? dataPrevista = null;
-                var cellDataPrev = row.Cell(pCols["DATA PREVISTA"]);
-                if (!cellDataPrev.IsEmpty())
+                // Status da Parcela:
+                StatusParcela status;
+                if (pCols.TryGetValue("STATUS", out var colStatus))
                 {
-                    if (cellDataPrev.DataType == XLDataType.DateTime)
-                        dataPrevista = cellDataPrev.GetDateTime().ToString("yyyy-MM-dd");
-                    else if (cellDataPrev.DataType == XLDataType.Number)
-                        dataPrevista = DateTime.FromOADate(cellDataPrev.GetDouble()).ToString("yyyy-MM-dd");
+                    var statusStr = GetStringValue(row.Cell(colStatus));
+                    if (string.Equals(statusStr, "PAGO", StringComparison.OrdinalIgnoreCase))
+                    {
+                        status = StatusParcela.Pago;
+                    }
+                    else if (string.Equals(statusStr, "PREVISTO", StringComparison.OrdinalIgnoreCase))
+                    {
+                        status = StatusParcela.Previsto;
+                    }
                     else
                     {
-                        var str = cellDataPrev.GetString().Trim();
-                        if (DateTime.TryParse(str, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dtParsed))
-                            dataPrevista = dtParsed.ToString("yyyy-MM-dd");
-                        else if (DateTime.TryParse(str, new CultureInfo("pt-BR"), DateTimeStyles.None, out var dtParsedPt))
-                            dataPrevista = dtParsedPt.ToString("yyyy-MM-dd");
+                        status = !string.IsNullOrWhiteSpace(dataPagamento) ? StatusParcela.Pago : StatusParcela.Previsto;
                     }
+                }
+                else
+                {
+                    status = !string.IsNullOrWhiteSpace(dataPagamento) ? StatusParcela.Pago : StatusParcela.Previsto;
+                }
+
+                // Data prevista se existir
+                string? dataPrevista = null;
+                if (pCols.TryGetValue("DATA PREVISTA", out var colDataPrev))
+                {
+                    var cellDataPrev = row.Cell(colDataPrev);
+                    if (!cellDataPrev.IsEmpty())
+                    {
+                        if (cellDataPrev.DataType == XLDataType.DateTime)
+                            dataPrevista = cellDataPrev.GetDateTime().ToString("yyyy-MM-dd");
+                        else if (cellDataPrev.DataType == XLDataType.Number)
+                            dataPrevista = DateTime.FromOADate(cellDataPrev.GetDouble()).ToString("yyyy-MM-dd");
+                        else
+                        {
+                            var str = cellDataPrev.GetString().Trim();
+                            if (DateTime.TryParse(str, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dtParsed))
+                                dataPrevista = dtParsed.ToString("yyyy-MM-dd");
+                            else if (DateTime.TryParse(str, new CultureInfo("pt-BR"), DateTimeStyles.None, out var dtParsedPt))
+                                dataPrevista = dtParsedPt.ToString("yyyy-MM-dd");
+                        }
+                    }
+                }
+                if (string.IsNullOrWhiteSpace(dataPrevista) && !string.IsNullOrWhiteSpace(dataPagamento))
+                {
+                    dataPrevista = dataPagamento;
                 }
 
                 var ben = beneficiarios.FirstOrDefault(b => b.Nome == nome);
                 var benId = ben?.Id ?? "ben-unknown";
 
-                var cpf = GetStringValue(row.Cell(pCols["CPF"]));
+                int colCpf = pCols.GetValueOrDefault("CPF", 2);
+                var cpf = GetStringValue(row.Cell(colCpf));
                 if (string.IsNullOrWhiteSpace(cpf) && ben != null)
                     cpf = ben.Cpf;
 
-                var formaPgto = GetStringValue(row.Cell(pCols["FORMA PGTO"]));
-                var chavePix = GetStringValue(row.Cell(pCols["CHAVE PIX"]));
+                int colForma = pCols.GetValueOrDefault("FORMA PGTO", 0);
+                var formaPgto = colForma > 0 ? GetStringValue(row.Cell(colForma)) : "PIX";
+
+                int colChave = 0;
+                if (pCols.TryGetValue("CHAVE", out var cCh)) colChave = cCh;
+                else if (pCols.TryGetValue("CHAVE PIX", out var cChPix)) colChave = cChPix;
+                var chavePix = colChave > 0 ? GetStringValue(row.Cell(colChave)) : "";
                 if (string.IsNullOrWhiteSpace(chavePix) && ben != null)
                     chavePix = ben.ChavePix;
 
-                var banco = GetStringValue(row.Cell(pCols["BANCO"]));
+                int colBanco = pCols.GetValueOrDefault("BANCO", 0);
+                var banco = colBanco > 0 ? GetStringValue(row.Cell(colBanco)) : "";
                 if (string.IsNullOrWhiteSpace(banco) && ben != null)
                     banco = ben.Banco;
 
@@ -197,15 +245,27 @@ public class ExcelSyncEngine
                 {
                     benAcumuladoPago[nome] = benAcumuladoPago.GetValueOrDefault(nome, 0m) + valor;
                 }
-                var saldo = GetDecimalValue(row.Cell(pCols["SALDO DEVEDOR"]));
+                int colSaldo = 0;
+                if (pCols.TryGetValue("SALDO", out var cS)) colSaldo = cS;
+                else if (pCols.TryGetValue("SALDO DEVEDOR", out var cSd)) colSaldo = cSd;
+                var saldo = colSaldo > 0 ? GetDecimalValue(row.Cell(colSaldo)) : 0m;
                 if (saldo <= 0 && ben != null)
                 {
                     saldo = Math.Max(0m, ben.ContratoTotal - benAcumuladoPago.GetValueOrDefault(nome, 0m));
                 }
 
-                var dia = GetStringValue(row.Cell(pCols["DIA"]));
-                var mes = GetStringValue(row.Cell(pCols["MÊS"]));
-                var ano = GetStringValue(row.Cell(pCols["ANO"]));
+                int colDia = pCols.GetValueOrDefault("DIA", 0);
+                int colMes = pCols.GetValueOrDefault("MÊS", 0);
+                int colAno = pCols.GetValueOrDefault("ANO", 0);
+
+                var dia = colDia > 0 ? GetStringValue(row.Cell(colDia)) : "";
+                var mes = colMes > 0 ? GetStringValue(row.Cell(colMes)) : "";
+                var ano = colAno > 0 ? GetStringValue(row.Cell(colAno)) : "";
+
+                if (!string.IsNullOrWhiteSpace(mes) && (decimal.TryParse(mes, out _) || mes.Length > 20))
+                {
+                    mes = "";
+                }
 
                 var dataReferencia = !string.IsNullOrWhiteSpace(dataPagamento) ? dataPagamento : dataPrevista;
                 if (!string.IsNullOrWhiteSpace(dataReferencia) && DateTime.TryParse(dataReferencia, out var dtVal))
@@ -221,7 +281,8 @@ public class ExcelSyncEngine
                         ano = dtVal.Year.ToString();
                 }
 
-                var cidadeUf = GetStringValue(row.Cell(pCols["CIDADE / UF"]));
+                int colCidade = pCols.GetValueOrDefault("CIDADE / UF", 0);
+                var cidadeUf = colCidade > 0 ? GetStringValue(row.Cell(colCidade)) : "Maceió - AL";
 
                 pagamentos.Add(new Pagamento
                 {
@@ -303,7 +364,7 @@ public class ExcelSyncEngine
         }
     }
 
-    private sealed record RowParcelaInfo(string Nome, int Parcela, bool IsPago, decimal Valor, XElement? CellK);
+    private sealed record RowParcelaInfo(string Nome, int Parcela, bool IsPago, decimal Valor, XElement? CellSaldo);
 
     private static byte[] AtualizarPlanilhaOpenXmlSurgical(byte[] sourceBytes, List<Pagamento> pagamentos)
     {
@@ -362,6 +423,57 @@ public class ExcelSyncEngine
             var mesesPt = new[] { "", "janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro" };
             var parcelasData = new List<RowParcelaInfo>();
 
+            // Mapeamento dinâmico das colunas a partir do cabeçalho da linha 1
+            var headerRow = rows.FirstOrDefault(r => r.Attribute("r")?.Value == "1");
+            var colLetterMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (headerRow != null)
+            {
+                foreach (var cell in headerRow.Elements(nsMain + "c"))
+                {
+                    var rVal = cell.Attribute("r")?.Value ?? "";
+                    var colLetter = System.Text.RegularExpressions.Regex.Match(rVal, @"^[A-Z]+").Value;
+                    if (string.IsNullOrEmpty(colLetter)) continue;
+
+                    string headerText = "";
+                    var tAttr = cell.Attribute("t")?.Value;
+                    var vVal = cell.Element(nsMain + "v")?.Value;
+                    if (tAttr == "s" && int.TryParse(vVal, out var sIdx) && sIdx >= 0 && sIdx < sharedStrings.Count)
+                    {
+                        headerText = sharedStrings[sIdx];
+                    }
+                    else if (tAttr == "str" || tAttr == "inlineStr")
+                    {
+                        headerText = cell.Element(nsMain + "v")?.Value ?? cell.Element(nsMain + "is")?.Element(nsMain + "t")?.Value ?? "";
+                    }
+                    else if (!string.IsNullOrEmpty(vVal))
+                    {
+                        headerText = vVal;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(headerText))
+                    {
+                        colLetterMap[headerText.Trim()] = colLetter;
+                    }
+                }
+            }
+
+            colLetterMap.TryGetValue("STATUS", out var colStatus);
+            colLetterMap.TryGetValue("VALOR", out var colValor);
+
+            string? colData = null;
+            if (colLetterMap.TryGetValue("DATA", out var cd)) colData = cd;
+            else if (colLetterMap.TryGetValue("DATA PAGAMENTO", out var cdp)) colData = cdp;
+
+            colLetterMap.TryGetValue("DATA PREVISTA", out var colDataPrev);
+
+            string? colSaldo = null;
+            if (colLetterMap.TryGetValue("SALDO", out var cs)) colSaldo = cs;
+            else if (colLetterMap.TryGetValue("SALDO DEVEDOR", out var csd)) colSaldo = csd;
+
+            colLetterMap.TryGetValue("DIA", out var colDia);
+            colLetterMap.TryGetValue("MÊS", out var colMes);
+            colLetterMap.TryGetValue("ANO", out var colAno);
+
             foreach (var row in rows)
             {
                 var rAttr = row.Attribute("r")?.Value;
@@ -394,76 +506,90 @@ public class ExcelSyncEngine
                 var key = KeyOf(rowNome, rowParcela);
                 if (pagMap.TryGetValue(key, out var pag))
                 {
-                    var cellD = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"D{rAttr}");
-                    if (cellD != null)
+                    if (!string.IsNullOrEmpty(colStatus))
                     {
-                        cellD.SetAttributeValue("t", "s");
-                        var vEl = cellD.Element(nsMain + "v");
-                        if (vEl == null) { vEl = new XElement(nsMain + "v"); cellD.Add(vEl); }
-                        vEl.Value = pag.Status == StatusParcela.Pago ? idxPago.ToString() : idxPrevisto.ToString();
+                        var cellStatus = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"{colStatus}{rAttr}");
+                        if (cellStatus != null)
+                        {
+                            var hasFormula = cellStatus.Element(nsMain + "f") != null;
+                            if (hasFormula)
+                            {
+                                cellStatus.SetAttributeValue("t", "str");
+                                var vEl = cellStatus.Element(nsMain + "v") ?? new XElement(nsMain + "v");
+                                if (cellStatus.Element(nsMain + "v") == null) cellStatus.Add(vEl);
+                                vEl.Value = pag.Status == StatusParcela.Pago ? "PAGO" : "PREVISTO";
+                            }
+                            else
+                            {
+                                cellStatus.SetAttributeValue("t", "s");
+                                var vEl = cellStatus.Element(nsMain + "v") ?? new XElement(nsMain + "v");
+                                if (cellStatus.Element(nsMain + "v") == null) cellStatus.Add(vEl);
+                                vEl.Value = pag.Status == StatusParcela.Pago ? idxPago.ToString() : idxPrevisto.ToString();
+                            }
+                        }
                     }
 
-                    if (pag.Valor > 0)
+                    if (!string.IsNullOrEmpty(colValor) && pag.Valor > 0)
                     {
-                        var cellE = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"E{rAttr}");
-                        if (cellE != null)
+                        var cellValor = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"{colValor}{rAttr}");
+                        if (cellValor != null)
                         {
-                            var vEl = cellE.Element(nsMain + "v");
-                            if (vEl == null) { vEl = new XElement(nsMain + "v"); cellE.Add(vEl); }
+                            var vEl = cellValor.Element(nsMain + "v");
+                            if (vEl == null) { vEl = new XElement(nsMain + "v"); cellValor.Add(vEl); }
                             vEl.Value = ((double)pag.Valor).ToString(CultureInfo.InvariantCulture);
                         }
                     }
 
-                    var cellF = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"F{rAttr}");
-                    var cellL = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"L{rAttr}");
-                    var cellM = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"M{rAttr}");
-                    var cellN = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"N{rAttr}");
+                    var cellData = !string.IsNullOrEmpty(colData) ? row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"{colData}{rAttr}") : null;
+                    var cellDia = !string.IsNullOrEmpty(colDia) ? row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"{colDia}{rAttr}") : null;
+                    var cellMes = !string.IsNullOrEmpty(colMes) ? row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"{colMes}{rAttr}") : null;
+                    var cellAno = !string.IsNullOrEmpty(colAno) ? row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"{colAno}{rAttr}") : null;
 
                     if (pag.Status == StatusParcela.Pago && !string.IsNullOrWhiteSpace(pag.DataPagamento) &&
                         DateTime.TryParseExact(pag.DataPagamento, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dtPag))
                     {
                         var oaDate = dtPag.ToOADate();
-                        if (cellF != null)
+                        if (cellData != null)
                         {
-                            cellF.Attribute("t")?.Remove();
-                            var vEl = cellF.Element(nsMain + "v");
-                            if (vEl == null) { vEl = new XElement(nsMain + "v"); cellF.Add(vEl); }
+                            cellData.Attribute("t")?.Remove();
+                            var vEl = cellData.Element(nsMain + "v");
+                            if (vEl == null) { vEl = new XElement(nsMain + "v"); cellData.Add(vEl); }
                             vEl.Value = ((int)oaDate).ToString();
                         }
-                        if (cellL != null)
+                        if (cellDia != null)
                         {
-                            cellL.SetAttributeValue("t", "str");
-                            var vEl = cellL.Element(nsMain + "v") ?? new XElement(nsMain + "v");
-                            if (cellL.Element(nsMain + "v") == null) cellL.Add(vEl);
+                            cellDia.SetAttributeValue("t", "str");
+                            var vEl = cellDia.Element(nsMain + "v") ?? new XElement(nsMain + "v");
+                            if (cellDia.Element(nsMain + "v") == null) cellDia.Add(vEl);
                             vEl.Value = dtPag.Day.ToString("00");
                         }
-                        if (cellM != null)
+                        if (cellMes != null)
                         {
-                            cellM.SetAttributeValue("t", "str");
-                            var vEl = cellM.Element(nsMain + "v") ?? new XElement(nsMain + "v");
-                            if (cellM.Element(nsMain + "v") == null) cellM.Add(vEl);
+                            cellMes.SetAttributeValue("t", "str");
+                            var vEl = cellMes.Element(nsMain + "v") ?? new XElement(nsMain + "v");
+                            if (cellMes.Element(nsMain + "v") == null) cellMes.Add(vEl);
                             vEl.Value = mesesPt[dtPag.Month];
                         }
-                        if (cellN != null)
+                        if (cellAno != null)
                         {
-                            cellN.Attribute("t")?.Remove();
-                            var vEl = cellN.Element(nsMain + "v") ?? new XElement(nsMain + "v");
-                            if (cellN.Element(nsMain + "v") == null) cellN.Add(vEl);
+                            cellAno.Attribute("t")?.Remove();
+                            var vEl = cellAno.Element(nsMain + "v") ?? new XElement(nsMain + "v");
+                            if (cellAno.Element(nsMain + "v") == null) cellAno.Add(vEl);
                             vEl.Value = dtPag.Year.ToString();
                         }
                     }
                     else
                     {
-                        cellF?.Element(nsMain + "v")?.Remove();
-                        cellL?.Element(nsMain + "v")?.Remove();
-                        cellM?.Element(nsMain + "v")?.Remove();
-                        cellN?.Element(nsMain + "v")?.Remove();
+                        cellData?.Element(nsMain + "v")?.Remove();
+                        cellDia?.Element(nsMain + "v")?.Remove();
+                        cellMes?.Element(nsMain + "v")?.Remove();
+                        cellAno?.Element(nsMain + "v")?.Remove();
                     }
 
-                    if (!string.IsNullOrWhiteSpace(pag.DataPrevista) &&
+                    if (!string.IsNullOrEmpty(colDataPrev) && !string.IsNullOrWhiteSpace(pag.DataPrevista) &&
                         DateTime.TryParseExact(pag.DataPrevista, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dtPrev))
                     {
-                        var cellG = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"G{rAttr}");
+                        var cellG = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"{colDataPrev}{rAttr}");
                         if (cellG != null)
                         {
                             var oaPrev = (int)dtPrev.ToOADate();
@@ -474,28 +600,44 @@ public class ExcelSyncEngine
                     }
                 }
 
-                var cStatus = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"D{rAttr}");
-                var cValor = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"E{rAttr}");
-                var cellK = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"K{rAttr}");
-
                 bool isPago = false;
-                if (cStatus != null)
+                if (!string.IsNullOrEmpty(colData))
                 {
-                    var sVal = cStatus.Element(nsMain + "v")?.Value;
-                    if (sVal == idxPago.ToString() || sVal == "3") isPago = true;
-                }
-
-                decimal rowValorDec = 0m;
-                if (cValor != null)
-                {
-                    var vVal = cValor.Element(nsMain + "v")?.Value;
-                    if (!string.IsNullOrEmpty(vVal) && decimal.TryParse(vVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsedVal))
+                    var cData = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"{colData}{rAttr}");
+                    if (cData?.Element(nsMain + "v") != null && !string.IsNullOrWhiteSpace(cData.Element(nsMain + "v")?.Value))
                     {
-                        rowValorDec = parsedVal;
+                        isPago = true;
+                    }
+                }
+                else if (!string.IsNullOrEmpty(colStatus))
+                {
+                    var cStatus = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"{colStatus}{rAttr}");
+                    if (cStatus != null)
+                    {
+                        var sVal = cStatus.Element(nsMain + "v")?.Value;
+                        if (string.Equals(sVal, "PAGO", StringComparison.OrdinalIgnoreCase) || sVal == idxPago.ToString() || sVal == "3") isPago = true;
                     }
                 }
 
-                parcelasData.Add(new RowParcelaInfo(rowNome, rowParcela, isPago, rowValorDec, cellK));
+                decimal rowValorDec = 0m;
+                if (!string.IsNullOrEmpty(colValor))
+                {
+                    var cValor = row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"{colValor}{rAttr}");
+                    if (cValor != null)
+                    {
+                        var vVal = cValor.Element(nsMain + "v")?.Value;
+                        if (!string.IsNullOrEmpty(vVal) && decimal.TryParse(vVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsedVal))
+                        {
+                            rowValorDec = parsedVal;
+                        }
+                    }
+                }
+
+                var cellSaldo = !string.IsNullOrEmpty(colSaldo)
+                    ? row.Elements(nsMain + "c").FirstOrDefault(c => c.Attribute("r")?.Value == $"{colSaldo}{rAttr}")
+                    : null;
+
+                parcelasData.Add(new RowParcelaInfo(rowNome, rowParcela, isPago, rowValorDec, cellSaldo));
             }
 
             var totalContratoPorBen = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
@@ -514,10 +656,10 @@ public class ExcelSyncEngine
                         acumuladoPago += item.Valor;
                     }
                     var saldoRestante = contratoBen - acumuladoPago;
-                    if (item.CellK != null)
+                    if (item.CellSaldo != null)
                     {
-                        var vEl = item.CellK.Element(nsMain + "v") ?? new XElement(nsMain + "v");
-                        if (item.CellK.Element(nsMain + "v") == null) item.CellK.Add(vEl);
+                        var vEl = item.CellSaldo.Element(nsMain + "v") ?? new XElement(nsMain + "v");
+                        if (item.CellSaldo.Element(nsMain + "v") == null) item.CellSaldo.Add(vEl);
                         vEl.Value = ((double)saldoRestante).ToString(CultureInfo.InvariantCulture);
                     }
                 }

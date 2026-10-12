@@ -32,8 +32,13 @@ builder.Services.AddCors(options =>
 });
 
 // Localização segura de caminhos
+const string PrimaryOneDriveExcelPath = "/home/alisson/Documentos/OneDrive/Documentos/##docs herança irmãos/CONTROLE PAGAMENTOS.xlsx";
+
 string FindFile(string filename)
 {
+    if (filename == "CONTROLE PAGAMENTOS.xlsx" && File.Exists(PrimaryOneDriveExcelPath))
+        return PrimaryOneDriveExcelPath;
+
     var current = new DirectoryInfo(AppContext.BaseDirectory);
     while (current != null)
     {
@@ -122,8 +127,12 @@ if (existingContrato == null)
         PagadorBanco = "104 - Caixa Econômica Federal",
         TituloContrato = "Contrato de Promessa de Cessão de Direitos Hereditários",
         DataContrato = "19 de agosto de 2025",
-        OnedriveExcelPath = excelPath
+        OnedriveExcelPath = File.Exists(PrimaryOneDriveExcelPath) ? PrimaryOneDriveExcelPath : excelPath
     });
+}
+else if (File.Exists(PrimaryOneDriveExcelPath) && existingContrato.OnedriveExcelPath != PrimaryOneDriveExcelPath)
+{
+    await contratoRepo.SaveAsync(existingContrato with { OnedriveExcelPath = PrimaryOneDriveExcelPath });
 }
 
 var existingBens = await benRepo.GetAllAsync();
@@ -137,14 +146,18 @@ if (existingBens.Count == 0 && File.Exists(excelPath))
 // -------------------------------------------------------------
 
 // Healthcheck
-app.MapGet("/api/health", () => Results.Ok(new
+app.MapGet("/api/health", async (ContratoRepository cRepo) =>
 {
-    status = "healthy",
-    version = "1.0.0",
-    excelFound = File.Exists(excelPath),
-    excelPath,
-    timestamp = DateTime.UtcNow
-}));
+    var caminho = await ObterCaminhoPlanilhaAsync(cRepo);
+    return Results.Ok(new
+    {
+        status = "healthy",
+        version = "1.0.0",
+        excelFound = File.Exists(caminho),
+        excelPath = caminho,
+        timestamp = DateTime.UtcNow
+    });
+});
 
 // Contrato
 app.MapGet("/api/contrato", async (ContratoRepository repo) =>
@@ -195,11 +208,21 @@ app.MapGet("/api/pagamentos/{id}", async (string id, PagamentoRepository repo) =
     return pag != null ? Results.Ok(pag) : Results.NotFound();
 });
 
-// Função auxiliar para obter o caminho ativo da planilha do contrato (com fallback para excelPath)
+// Função auxiliar para obter o caminho ativo da planilha do contrato (com prioridade ao OneDrive se existir)
 async Task<string> ObterCaminhoPlanilhaAsync(ContratoRepository repo)
 {
+    if (File.Exists(PrimaryOneDriveExcelPath))
+    {
+        return PrimaryOneDriveExcelPath;
+    }
+
     var c = await repo.GetAsync();
-    return !string.IsNullOrEmpty(c?.OnedriveExcelPath) ? c.OnedriveExcelPath : excelPath;
+    if (!string.IsNullOrEmpty(c?.OnedriveExcelPath) && File.Exists(c.OnedriveExcelPath))
+    {
+        return c.OnedriveExcelPath;
+    }
+
+    return excelPath;
 }
 
 app.MapPost("/api/pagamentos/{id}/quitar", async (
@@ -427,7 +450,7 @@ app.MapGet("/api/export/csv", async (PagamentoRepository pagRepo, BeneficiarioRe
     var benMap = (await benRepo.GetAllAsync()).ToDictionary(b => b.Id, b => b);
 
     var sb = new System.Text.StringBuilder();
-    sb.AppendLine("NOME;CPF;PARCELA;STATUS;VALOR;DATA PAGAMENTO;DATA PREVISTA;FORMA PGTO;CHAVE PIX;BANCO;SALDO DEVEDOR;DIA;MÊS;ANO;CIDADE / UF");
+    sb.AppendLine("NOME;CPF;PARCELA;STATUS;VALOR;DATA PREVISTA;DATA PAGAMENTO;FORMA PGTO;CHAVE PIX;BANCO;SALDO DEVEDOR;DIA;MÊS;ANO;CIDADE / UF");
 
     var mesesPt = new[] { "", "janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro" };
 
@@ -450,7 +473,7 @@ app.MapGet("/api/export/csv", async (PagamentoRepository pagRepo, BeneficiarioRe
         var saldoStr = p.SaldoAposParcela.ToString("F2", new System.Globalization.CultureInfo("pt-BR"));
         var statusStr = p.Status == AppRecibos.Core.Domain.Enums.StatusParcela.Pago ? "PAGO" : "PREVISTO";
 
-        sb.AppendLine($"\"{EscapeCsv(p.BeneficiarioNome)}\";\"{EscapeCsv(p.BeneficiarioCpf)}\";{p.ParcelaNumero};\"{statusStr}\";{valorStr};\"{p.DataPagamento ?? ""}\";\"{p.DataPrevista ?? ""}\";\"{EscapeCsv(p.FormaPgto)}\";\"{EscapeCsv(p.ChavePix)}\";\"{EscapeCsv(p.Banco)}\";{saldoStr};\"{dia}\";\"{mes}\";\"{ano}\";\"{EscapeCsv(cidadeUf)}\"");
+        sb.AppendLine($"\"{EscapeCsv(p.BeneficiarioNome)}\";\"{EscapeCsv(p.BeneficiarioCpf)}\";{p.ParcelaNumero};\"{statusStr}\";{valorStr};\"{p.DataPrevista ?? ""}\";\"{p.DataPagamento ?? ""}\";\"{EscapeCsv(p.FormaPgto)}\";\"{EscapeCsv(p.ChavePix)}\";\"{EscapeCsv(p.Banco)}\";{saldoStr};\"{dia}\";\"{mes}\";\"{ano}\";\"{EscapeCsv(cidadeUf)}\"");
     }
 
     var preamble = System.Text.Encoding.UTF8.GetPreamble();

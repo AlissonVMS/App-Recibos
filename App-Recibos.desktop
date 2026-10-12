@@ -9,3 +9,4 @@ Icon=/home/alisson/Documentos/_Projetos/App Recibos/core/src/AppRecibos.Desktop/
 Terminal=false
 Categories=Office;Finance;
 StartupNotify=true
+StartupWMClass=AppRecibos.Desktop

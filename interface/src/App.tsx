@@ -64,7 +64,7 @@ export const isPrevisto = (status?: string) => status?.toString().toUpperCase() 
 
 export const formatarDataParcela = (p?: PaymentRecord | null): string => {
   if (!p) return '-';
-  if (p.dia && p.mes && p.ano) {
+  if (p.dia && p.mes && p.ano && isNaN(Number(p.mes))) {
     const mesCurto = p.mes.length > 3 ? p.mes.slice(0, 3) : p.mes;
     return `${p.dia} ${mesCurto} ${p.ano}`;
   }
@@ -78,7 +78,7 @@ export const formatarDataParcela = (p?: PaymentRecord | null): string => {
 
 export const formatarMesDiaCurto = (p?: PaymentRecord | null): string => {
   if (!p) return '-';
-  if (p.dia && p.mes) {
+  if (p.dia && p.mes && isNaN(Number(p.mes))) {
     const mesCurto = p.mes.length > 3 ? p.mes.slice(0, 3) : p.mes;
     return `${p.dia}/${mesCurto}`;
   }
@@ -174,21 +174,23 @@ export function App() {
 
   useEffect(() => {
     async function initBackend() {
-      const isOnline = await apiService.checkHealth();
-      setIsBackendConnected(isOnline);
-      if (isOnline) {
-        try {
-          const [c, b, p] = await Promise.all([
-            apiService.getContrato(),
-            apiService.getBeneficiarios(),
-            apiService.getPagamentos(),
-          ]);
+      try {
+        const [c, b, p] = await Promise.all([
+          apiService.getContrato(),
+          apiService.getBeneficiarios(),
+          apiService.getPagamentos(),
+        ]);
+        if (c || (b && b.length > 0) || (p && p.length > 0)) {
+          setIsBackendConnected(true);
           if (c) setContract(c);
           if (b && b.length > 0) setBeneficiaries(b);
           if (p && p.length > 0) setPayments(p);
-        } catch (err) {
-          console.warn('Erro ao carregar dados do backend C#:', err);
+        } else {
+          const isOnline = await apiService.checkHealth();
+          setIsBackendConnected(isOnline);
         }
+      } catch (err) {
+        console.warn('Erro ao carregar dados do backend C#:', err);
       }
     }
     initBackend();
@@ -1396,7 +1398,7 @@ export function App() {
             </div>
 
             {/* Barra Fixa Unificada de Pesquisa, Filtros e Ações de Seleção (Estilo Planilha Excel) */}
-            <div className="sticky top-[106px] z-20 bg-slate-50/95 backdrop-blur-md pt-1 pb-2.5 -mt-1 space-y-2">
+            <div className="sticky top-[106px] z-20 bg-slate-50 pt-1 pb-2.5 -mt-1 space-y-2">
               {/* Barra Principal: Caixa de Pesquisa, Filtros e Atalhos de Seleção */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-2.5 sm:p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 {/* Campo de Pesquisa Rápida */}
@@ -1542,45 +1544,16 @@ export function App() {
                     {selectedPaidTablePayments.length > 0 && (
                       <button
                         type="button"
-                        disabled={isDownloadingBatchZip}
-                        onClick={handleDirectDownloadZip}
-                        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white rounded-lg shadow-md transition-all whitespace-nowrap ring-2 ring-blue-400/30 ${
-                          isDownloadingBatchZip
-                            ? 'bg-blue-400 cursor-wait'
-                            : 'bg-blue-600 hover:bg-blue-500 cursor-pointer active:scale-95'
-                        }`}
+                        onClick={handleOpenReceiptsPreview}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-md transition-all cursor-pointer whitespace-nowrap active:scale-95 ring-2 ring-blue-400/30"
                         title={
                           selectedPaidTablePayments.length === 1
-                            ? `Baixar PDF: ${gerarNomeArquivoRecibo(selectedPaidTablePayments[0])}`
-                            : `Baixar ZIP: ${gerarNomeArquivoLote(selectedPaidTablePayments)}`
+                            ? `Emitir Recibo: ${gerarNomeArquivoRecibo(selectedPaidTablePayments[0])}`
+                            : `Emitir ${selectedPaidTablePayments.length} Recibos em Lote`
                         }
                       >
-                        {isDownloadingBatchZip ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : selectedPaidTablePayments.length === 1 ? (
-                          <Download className="w-3.5 h-3.5" />
-                        ) : (
-                          <Archive className="w-3.5 h-3.5" />
-                        )}
-                        <span>
-                          {isDownloadingBatchZip
-                            ? 'Salvando...'
-                            : selectedPaidTablePayments.length === 1
-                            ? 'Baixar PDF (1)'
-                            : `Baixar ZIP (${selectedPaidTablePayments.length})`}
-                        </span>
-                      </button>
-                    )}
-
-                    {selectedPaidTablePayments.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleOpenReceiptsPreview}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-100 bg-slate-800/80 hover:bg-slate-700/80 border border-blue-500/40 rounded-lg shadow-sm transition-all cursor-pointer whitespace-nowrap active:scale-95"
-                        title="Conferir previamente os recibos das parcelas pagas selecionadas"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Conferir ({selectedPaidTablePayments.length})</span>
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Emitir Recibo(s) ({selectedPaidTablePayments.length})</span>
                       </button>
                     )}
 
@@ -1610,9 +1583,9 @@ export function App() {
 
             {/* Table com Cabeçalho Fixo (Freeze Panes estilo Excel) */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="overflow-auto max-h-[calc(100vh-275px)] min-h-[460px]">
+              <div className="overflow-auto max-h-[calc(100vh-275px)] min-h-[460px] transform-gpu">
                 <table className="w-full text-left text-xs text-slate-700">
-                  <thead className="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase tracking-wider text-[11px] sticky top-0 z-10 shadow-2xs">
+                  <thead className="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase tracking-wider text-[11px] sticky top-0 z-10">
                     <tr>
                       <th className="py-2.5 px-3 text-center w-10 select-none">
                         <input
@@ -1804,7 +1777,7 @@ export function App() {
                         // Data prevista formatada
                         const previsaoFormatada = p.dataPrevista && p.dataPrevista.includes('-')
                           ? `${p.dataPrevista.split('-')[2]}/${p.dataPrevista.split('-')[1]}/${p.dataPrevista.split('-')[0]}`
-                          : p.dia && p.mes && p.ano
+                          : p.dia && p.mes && p.ano && isNaN(Number(p.mes))
                           ? `${p.dia.padStart(2, '0')}/${p.mes.slice(0, 3)}/${p.ano}`
                           : (p.data || '-');
 
@@ -1954,43 +1927,18 @@ export function App() {
                                   </button>
                                 )}
 
-                                {/* Download direto do PDF (abre a janela do sistema para escolher onde salvar) */}
-                                <button
-                                  type="button"
-                                  disabled={downloadingRowId !== null}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDirectDownloadPdf(p);
-                                  }}
-                                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white rounded-lg transition-colors shadow-2xs ${
-                                    downloadingRowId === p.id
-                                      ? 'bg-blue-400 cursor-wait'
-                                      : downloadingRowId !== null
-                                      ? 'bg-blue-300 cursor-not-allowed'
-                                      : 'bg-blue-600 hover:bg-blue-700 cursor-pointer'
-                                  }`}
-                                  title={`Baixar PDF: ${gerarNomeArquivoRecibo(p)}`}
-                                >
-                                  {downloadingRowId === p.id ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  ) : (
-                                    <Download className="w-3.5 h-3.5" />
-                                  )}
-                                  <span>{downloadingRowId === p.id ? 'Salvando...' : 'Baixar PDF'}</span>
-                                </button>
-
-                                {/* Visualizar recibo em tela cheia (conferência / impressão) */}
+                                {/* Emitir Recibo Oficial (Conferência prévia, visualização, impressão ou download) */}
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setViewingReceiptPayment(p);
                                   }}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/90 rounded-lg transition-colors shadow-2xs cursor-pointer"
-                                  title="Visualizar recibo para conferência ou impressão"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/90 rounded-lg transition-colors shadow-2xs cursor-pointer active:scale-95"
+                                  title={`Emitir Recibo: ${gerarNomeArquivoRecibo(p)}`}
                                 >
-                                  <Eye className="w-3.5 h-3.5 text-blue-600" />
-                                  <span>Visualizar</span>
+                                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Emitir Recibo</span>
                                 </button>
 
                                 {/* Editar */}
