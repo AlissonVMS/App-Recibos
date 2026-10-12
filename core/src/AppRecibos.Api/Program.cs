@@ -350,8 +350,7 @@ app.MapGet("/api/recibos/{id}/pdf", async (
     var dados = new ReciboDados(pag, ben, contrato);
     var pdfBytes = pdfGen.GerarReciboPdf(dados);
 
-    var valorStr = NumberToWordsPtBr.FormatarNumeroMoeda(pag.Valor);
-    var fileName = QuestPdfReceiptGenerator.SanitizarNomeArquivo($"{pag.BeneficiarioNome} - Parcela {pag.ParcelaNumero} - R$ {valorStr}.pdf");
+    var fileName = QuestPdfReceiptGenerator.GerarNomeArquivoRecibo(pag);
 
     return Results.File(pdfBytes, "application/pdf", fileName);
 });

@@ -42,7 +42,92 @@ public class QuestPdfReceiptGenerator
     {
         var invalidos = Path.GetInvalidFileNameChars();
         var limpo = new string(nome.Where(c => !invalidos.Contains(c)).ToArray());
-        return limpo.Replace("  ", " ").Trim();
+        return Regex.Replace(limpo, @"\s+", " ").Trim();
+    }
+
+    public static string GerarNomeArquivoRecibo(Pagamento pag, int sufixo = 0)
+    {
+        var nomeUpper = Regex.Replace(pag.BeneficiarioNome?.Trim() ?? string.Empty, @"\s+", " ").ToUpperInvariant();
+        var numParcela = Regex.Replace(pag.ParcelaNumero.ToString(), @"\D+", "");
+        if (string.IsNullOrWhiteSpace(numParcela)) numParcela = pag.ParcelaNumero.ToString();
+        var parcelaUpper = $"P{numParcela}";
+
+        long inteiro = (long)Math.Truncate(Math.Abs(pag.Valor));
+        int centavos = (int)Math.Round((Math.Abs(pag.Valor) - inteiro) * 100);
+        var valorFormatado = $"R${inteiro},{centavos:D2}";
+
+        string dia = "";
+        string mesNum = "";
+        string ano = "";
+
+        var rawDate = (!string.IsNullOrWhiteSpace(pag.DataPagamento) ? pag.DataPagamento
+                    : !string.IsNullOrWhiteSpace(pag.DataPrevista) ? pag.DataPrevista
+                    : pag.Data ?? string.Empty).Trim();
+
+        if (rawDate.Contains('-'))
+        {
+            var parts = rawDate.Split('-');
+            if (parts.Length == 3)
+            {
+                if (parts[0].Length == 4)
+                {
+                    ano = parts[0];
+                    mesNum = parts[1];
+                    dia = parts[2];
+                }
+                else
+                {
+                    dia = parts[0];
+                    mesNum = parts[1];
+                    ano = parts[2];
+                }
+            }
+        }
+        else if (rawDate.Contains('/'))
+        {
+            var parts = rawDate.Split('/');
+            if (parts.Length == 3)
+            {
+                if (parts[0].Length == 4)
+                {
+                    ano = parts[0];
+                    mesNum = parts[1];
+                    dia = parts[2];
+                }
+                else
+                {
+                    dia = parts[0];
+                    mesNum = parts[1];
+                    ano = parts[2];
+                }
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(dia) && !string.IsNullOrWhiteSpace(pag.Dia)) dia = pag.Dia.Trim();
+        if (string.IsNullOrWhiteSpace(ano) && !string.IsNullOrWhiteSpace(pag.Ano)) ano = pag.Ano.Trim();
+
+        if (string.IsNullOrWhiteSpace(mesNum) && !string.IsNullOrWhiteSpace(pag.Mes))
+        {
+            var mesStr = pag.Mes.Trim();
+            if (int.TryParse(mesStr, out var mNum) && mNum >= 1 && mNum <= 12)
+            {
+                mesNum = mNum.ToString("D2");
+            }
+            else
+            {
+                var idx = Array.FindIndex(NumberToWordsPtBr.MesesPtBr, m => m.Equals(mesStr, StringComparison.OrdinalIgnoreCase));
+                mesNum = (idx >= 0 ? idx + 1 : 1).ToString("D2");
+            }
+        }
+
+        dia = (string.IsNullOrWhiteSpace(dia) ? "01" : dia).PadLeft(2, '0');
+        mesNum = (string.IsNullOrWhiteSpace(mesNum) ? "01" : mesNum).PadLeft(2, '0');
+        ano = string.IsNullOrWhiteSpace(ano) ? DateTime.Now.Year.ToString() : ano;
+
+        var dataFormatada = $"{dia}-{mesNum}-{ano}";
+        var baseNome = $"RECIBO {nomeUpper} {parcelaUpper} {valorFormatado} {dataFormatada}".ToUpperInvariant();
+        var limpo = SanitizarNomeArquivo(baseNome);
+        return sufixo > 0 ? $"{limpo} ({sufixo}).pdf" : $"{limpo}.pdf";
     }
 
     public byte[] GerarReciboPdf(ReciboDados dados)
@@ -213,8 +298,7 @@ public class QuestPdfReceiptGenerator
             foreach (var item in itens)
             {
                 var pdfBytes = GerarReciboPdf(item);
-                var valorStr = NumberToWordsPtBr.FormatarNumeroMoeda(item.Pagamento.Valor);
-                var fileName = SanitizarNomeArquivo($"{item.Pagamento.BeneficiarioNome} - Parcela {item.Pagamento.ParcelaNumero} - R$ {valorStr}.pdf");
+                var fileName = GerarNomeArquivoRecibo(item.Pagamento);
 
                 var entry = archive.CreateEntry(fileName, CompressionLevel.Optimal);
                 using var entryStream = entry.Open();

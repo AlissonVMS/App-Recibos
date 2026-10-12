@@ -19,33 +19,90 @@ export function sanitizarNomeArquivo(texto: string): string {
 }
 
 /**
+ * Extrai a data no formato DD-MM-AAAA a partir dos dados do pagamento,
+ * suportando tanto YYYY-MM-DD quanto dia/mes/ano textuais.
+ */
+export function extrairDataFormatadaPtBr(pagamento: {
+  data?: string;
+  dataPagamento?: string;
+  dataPrevista?: string;
+  dia?: string | number;
+  mes?: string | number;
+  ano?: string | number;
+}): string {
+  let dia = '';
+  let mesNum = '';
+  let ano = '';
+
+  const rawDate = (pagamento.dataPagamento || pagamento.dataPrevista || pagamento.data || '').trim();
+  if (rawDate.includes('-')) {
+    const parts = rawDate.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD
+        ano = parts[0];
+        mesNum = parts[1];
+        dia = parts[2];
+      } else {
+        // DD-MM-YYYY
+        dia = parts[0];
+        mesNum = parts[1];
+        ano = parts[2];
+      }
+    }
+  } else if (rawDate.includes('/')) {
+    const parts = rawDate.split('/');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY/MM/DD
+        ano = parts[0];
+        mesNum = parts[1];
+        dia = parts[2];
+      } else {
+        // DD/MM/YYYY
+        dia = parts[0];
+        mesNum = parts[1];
+        ano = parts[2];
+      }
+    }
+  }
+
+  if (!dia && pagamento.dia) dia = String(pagamento.dia).trim();
+  if (!ano && pagamento.ano) ano = String(pagamento.ano).trim();
+
+  if (!mesNum && pagamento.mes) {
+    const mesStr = String(pagamento.mes).trim().toLowerCase();
+    const num = parseInt(mesStr, 10);
+    if (!isNaN(num) && num >= 1 && num <= 12) {
+      mesNum = num.toString().padStart(2, '0');
+    } else {
+      const idx = MESES_PT_BR.indexOf(mesStr);
+      mesNum = (idx >= 0 ? idx + 1 : 1).toString().padStart(2, '0');
+    }
+  }
+
+  dia = (dia || '01').padStart(2, '0');
+  mesNum = (mesNum || '01').padStart(2, '0');
+  ano = ano || String(new Date().getFullYear());
+
+  return `${dia}-${mesNum}-${ano}`;
+}
+
+/**
  * Nome padrão do arquivo do recibo conforme especificação estrita do usuário:
- * Ex: "RECIBO ELINALDO MARQUES DA SILVA P11 R$1000,00 11-07-2026.pdf"
- * A estrutura é SEMPRE EM MAIÚSCULO.
+ * Ex: "RECIBO ELISANGELA M V DE ARAÚJO P12 R$1000,00 10-08-2026.pdf"
+ * Padrão: RECIBO {NOME} P{XX} R${VALOR} {DD-MM-AAAA}.pdf (apenas PXX, sem a palavra "Parcela").
  */
 export function gerarNomeArquivoRecibo(
   pagamento: PaymentRecord,
   sufixo: number = 0
 ): string {
-  const nomeUpper = pagamento.nome.trim().toUpperCase();
-  const parcelaUpper = `P${pagamento.parcela}`.toUpperCase();
+  const nomeUpper = (pagamento.nome || '').replace(/\s+/g, ' ').trim().toUpperCase();
+  const numParcela = String(pagamento.parcela ?? '').replace(/\D+/g, '') || String(pagamento.parcela ?? '1');
+  const parcelaUpper = `P${numParcela}`;
   const valorFormatado = `R$${formatarValorParaNomeArquivo(pagamento.valor)}`;
+  const dataFormatada = extrairDataFormatadaPtBr(pagamento);
 
-  let dia = pagamento.dia;
-  let mesNum = '';
-  let ano = pagamento.ano;
-
-  if (pagamento.data && pagamento.data.includes('-')) {
-    const parts = pagamento.data.split('-');
-    ano = parts[0];
-    mesNum = parts[1];
-    dia = parts[2];
-  } else {
-    const mesIndex = MESES_PT_BR.indexOf(pagamento.mes.toLowerCase());
-    mesNum = (mesIndex >= 0 ? mesIndex + 1 : 1).toString().padStart(2, '0');
-  }
-
-  const dataFormatada = `${dia.padStart(2, '0')}-${mesNum.padStart(2, '0')}-${ano}`;
   const base = `RECIBO ${nomeUpper} ${parcelaUpper} ${valorFormatado} ${dataFormatada}`.toUpperCase();
   const limpo = sanitizarNomeArquivo(base);
   return sufixo > 0 ? `${limpo} (${sufixo}).pdf` : `${limpo}.pdf`;
@@ -98,21 +155,8 @@ export function gerarNomeArquivoLote(pagamentos: PaymentRecord[]): string {
   }
 
   const datasParsed: DataParsed[] = pagos.map((p) => {
-    let dia = p.dia.padStart(2, '0');
-    let mes = '';
-    let ano = p.ano;
-
-    const dataRef = p.dataPagamento || p.data;
-    if (dataRef && dataRef.includes('-')) {
-      const parts = dataRef.split('-');
-      ano = parts[0];
-      mes = parts[1].padStart(2, '0');
-      dia = parts[2].padStart(2, '0');
-    } else {
-      const mesIndex = MESES_PT_BR.indexOf(p.mes.toLowerCase());
-      mes = (mesIndex >= 0 ? mesIndex + 1 : 1).toString().padStart(2, '0');
-    }
-
+    const formatted = extrairDataFormatadaPtBr(p);
+    const [dia, mes, ano] = formatted.split('-');
     return {
       iso: `${ano}-${mes}-${dia}`,
       dia,

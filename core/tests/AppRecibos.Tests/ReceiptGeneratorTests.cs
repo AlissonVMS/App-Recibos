@@ -168,6 +168,9 @@ public class ReceiptGeneratorTests
         foreach (var entry in archive.Entries)
         {
             entry.Name.Should().EndWith(".pdf");
+            entry.Name.Should().StartWith("RECIBO BENEFICIÁRIO ");
+            entry.Name.Should().Contain(" R$1000,00 10-10-2026.pdf");
+            entry.Name.Should().NotContain("Parcela");
             using var entryStream = entry.Open();
             using var mem = new MemoryStream();
             entryStream.CopyTo(mem);
@@ -175,5 +178,30 @@ public class ReceiptGeneratorTests
             var entryHeader = System.Text.Encoding.ASCII.GetString(mem.ToArray()[..4]);
             entryHeader.Should().Be("%PDF");
         }
+    }
+
+    [Fact]
+    public void GerarNomeArquivoRecibo_DeveSeguirPadraoEspecificadoPeloUsuario()
+    {
+        var pag = new Pagamento
+        {
+            Id = "pg-12",
+            BeneficiarioId = "ben-1",
+            BeneficiarioNome = "Elisangela M V de Araújo",
+            BeneficiarioCpf = "000.000.000-00",
+            ParcelaNumero = 12,
+            Valor = 1000m,
+            Status = StatusParcela.Pago,
+            DataPagamento = "2026-08-10",
+            FormaPgto = "PIX",
+            ChavePix = "chave",
+            Banco = "Nubank",
+            SaldoAposParcela = 0m,
+            CidadeUf = "Maceió - AL"
+        };
+
+        var nomeArquivo = QuestPdfReceiptGenerator.GerarNomeArquivoRecibo(pag);
+
+        nomeArquivo.Should().Be("RECIBO ELISANGELA M V DE ARAÚJO P12 R$1000,00 10-08-2026.pdf");
     }
 }
