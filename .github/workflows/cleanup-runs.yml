@@ -1,0 +1,92 @@
+name: Cleanup Workflow Runs and Storage
+
+on:
+  push:
+    paths:
+      - '.github/workflows/cleanup-runs.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Limpar Runs Antigos e Artefatos Excedentes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            console.log(`Buscando workflow runs em ${owner}/${repo}...`);
+            const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+
+            // Identifica o último run com sucesso do 'Build Desktop Packages'
+            const desktopRuns = runs.filter(r => r.name === 'Build Desktop Packages');
+            const successfulDesktopRuns = desktopRuns.filter(r => r.conclusion === 'success');
+            successfulDesktopRuns.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            const keepRun = successfulDesktopRuns[0];
+            const keepRunId = keepRun ? keepRun.id : null;
+
+            if (keepRunId) {
+              console.log(`Último run com sucesso identificado: ID ${keepRunId} (${keepRun.created_at})`);
+            } else {
+              console.log('Nenhum run com sucesso encontrado para manter.');
+            }
+
+            // 1. Exclui primeiro artefatos órfãos ou de runs cancelados
+            console.log('Listando artefatos do repositório...');
+            const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            console.log(`Total de artefatos encontrados: ${artifacts.length}`);
+
+            for (const a of artifacts) {
+              const runId = a.workflow_run ? a.workflow_run.id : null;
+              if (runId && runId === keepRunId) {
+                console.log(`Mantendo artefato ID ${a.id} (${a.name}, ${(a.size_in_bytes / 1024 / 1024).toFixed(2)} MB) do run mantido ${keepRunId}`);
+              } else {
+                console.log(`Excluindo artefato excedente ID ${a.id} (${a.name}, ${(a.size_in_bytes / 1024 / 1024).toFixed(2)} MB)...`);
+                try {
+                  await github.rest.actions.deleteArtifact({
+                    owner,
+                    repo,
+                    artifact_id: a.id,
+                  });
+                  console.log(`Artefato ${a.id} excluído com sucesso!`);
+                } catch (err) {
+                  console.error(`Erro ao excluir artefato ${a.id}:`, err.message);
+                }
+              }
+            }
+
+            // 2. Exclui os workflow runs cancelados/antigos
+            for (const r of desktopRuns) {
+              if (r.id === keepRunId) {
+                console.log(`Preservando run bem-sucedido: ID ${r.id} (${r.name})`);
+                continue;
+              }
+
+              console.log(`Excluindo run ID ${r.id} (Status: ${r.status}, Conclusão: ${r.conclusion}, Data: ${r.created_at})...`);
+              try {
+                await github.rest.actions.deleteWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: r.id,
+                });
+                console.log(`Run ${r.id} excluído com sucesso!`);
+              } catch (err) {
+                console.error(`Erro ao excluir run ${r.id}:`, err.message);
+              }
+            }
+
+            console.log('Operação de limpeza de armazenamento concluída com sucesso!');
