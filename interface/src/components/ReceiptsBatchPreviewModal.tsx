@@ -2,11 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ContractConfig, PaymentRecord } from '../types';
 import { ReceiptDocument } from './ReceiptDocument';
 import {
-  baixarPdfRecibo,
-  baixarPdfRecibosZip,
   gerarNomeArquivoLote,
   gerarNomeArquivoRecibo,
-} from '../utils/pdfGenerator';
+} from '../utils/receiptNaming';
 import { imprimirLoteRecibos, imprimirElementoRecibo } from '../utils/printHelper';
 import { formatarMoeda, formatarDataPtBr } from '../utils/numberToWordsPtBr';
 import {
@@ -94,6 +92,7 @@ export const ReceiptsBatchPreviewModal: React.FC<ReceiptsBatchPreviewModalProps>
     if (paidPayments.length === 0) return;
     setIsGenerating(true);
     try {
+      const { baixarPdfRecibo, baixarPdfRecibosZip } = await import('../utils/pdfGenerator');
       let result;
       if (paidPayments.length === 1) {
         result = await baixarPdfRecibo(paidPayments[0], contract);

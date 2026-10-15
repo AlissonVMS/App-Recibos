@@ -17,12 +17,12 @@ interface/dist
 package-lock.json
 interface/package-lock.json
 
-# .NET / Backend (core/)
-core/**/bin/
-core/**/obj/
-core/**/.vs/
-core/**/TestResults/
-publish/
+# .NET / Backend
+**/bin/
+**/obj/
+**/.vs/
+**/TestResults/
+**/publish/
 *.user
 *.userosscache
 *.sln.docstates

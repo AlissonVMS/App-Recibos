@@ -106,7 +106,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
           {/* ================================================================= */}
 
           {/* Linha Guia: COMPROMETIDO (Amarelo) */}
-          <g className="transition-all duration-500">
+          <g>
             {/* Ponto de ancoragem no arco */}
             <circle
               cx={compAnchorX}
@@ -185,7 +185,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
           </g>
 
           {/* Linha Guia: REALIZADO (Verde) */}
-          <g className="transition-all duration-500">
+          <g>
             {/* Ponto de ancoragem no arco */}
             <circle
               cx={realAnchorX}
@@ -287,7 +287,6 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
               fill="transparent"
               strokeDasharray={`${strokePaid} ${circumference}`}
               strokeLinecap="round"
-              className="transition-all duration-700 ease-out"
             />
 
             {/* Segmento Comprometido (Amarelo Âmbar) */}
@@ -302,7 +301,6 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
                 strokeDasharray={`${strokePending} ${circumference}`}
                 strokeDashoffset={-strokePaid}
                 strokeLinecap="round"
-                className="transition-all duration-700 ease-out"
               />
             )}
           </g>

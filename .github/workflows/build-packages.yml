@@ -5,6 +5,9 @@ on:
     types: [published]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build for ${{ matrix.os }} (${{ matrix.rid }})
@@ -87,3 +90,12 @@ jobs:
         path: |
           AppRecibos-${{ matrix.rid }}.zip
           AppRecibos-${{ matrix.rid }}.tar.gz
+
+    - name: Upload to GitHub Release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          AppRecibos-${{ matrix.rid }}.zip
+          AppRecibos-${{ matrix.rid }}.tar.gz
+        fail_on_unmatched_files: false

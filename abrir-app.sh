@@ -21,6 +21,9 @@ if [ -n "$DOTNET_ROOT" ]; then
     export PATH="$DOTNET_ROOT:$PATH"
 fi
 
+# Otimização Linux: desativa DMA-BUF renderer para inicialização instantânea do WebKitGTK (evita handshake de GPU)
+export WEBKIT_DISABLE_DMABUF_RENDERER=1
+
 rebuild_app() {
     echo "[App-Recibos] Atualizando e compilando frontend e backend..."
     if [ -d "interface" ]; then

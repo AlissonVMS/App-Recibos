@@ -13,6 +13,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Porta padrão 5000
 builder.WebHost.UseUrls("http://127.0.0.1:5000");
 
+// Otimização de logging para inicialização instantânea
+builder.Logging.ClearProviders();
+builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
+builder.Logging.AddFilter("System", LogLevel.Warning);
+
 // Configuração JSON com camelCase e enum como string
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -105,59 +110,61 @@ if (!string.IsNullOrEmpty(distDir))
     app.UseStaticFiles(new StaticFileOptions { FileProvider = fileProvider });
 }
 
-// Inicialização e Seed do Banco de Dados
+// Inicialização do Banco de Dados
 var connectionFactory = app.Services.GetRequiredService<SqliteDbConnectionFactory>();
 connectionFactory.InitializeDatabase();
 
-var contratoRepo = app.Services.GetRequiredService<ContratoRepository>();
-var benRepo = app.Services.GetRequiredService<BeneficiarioRepository>();
-var pagRepo = app.Services.GetRequiredService<PagamentoRepository>();
-var syncService = app.Services.GetRequiredService<SyncService>();
-var bacenRepo = app.Services.GetRequiredService<BacenRepository>();
-
-// Seed inicial se o banco estiver vazio
-var excelPath = FindFile("CONTROLE PAGAMENTOS.xlsx");
-var existingContrato = await contratoRepo.GetAsync();
-if (existingContrato == null)
+// Seed inicial em background para liberar o servidor instantaneamente (<40ms)
+_ = Task.Run(async () =>
 {
-    await contratoRepo.SaveAsync(new ContratoConfig
+    try
     {
-        PagadorNome = "ABIGAIL PAULINO DA SILVA",
-        PagadorCpf = "450.519.504-00",
-        PagadorBanco = "104 - Caixa Econômica Federal",
-        TituloContrato = "Contrato de Promessa de Cessão de Direitos Hereditários",
-        DataContrato = "19 de agosto de 2025",
-        OnedriveExcelPath = File.Exists(PrimaryOneDriveExcelPath) ? PrimaryOneDriveExcelPath : excelPath
-    });
-}
-else if (File.Exists(PrimaryOneDriveExcelPath) && existingContrato.OnedriveExcelPath != PrimaryOneDriveExcelPath)
-{
-    await contratoRepo.SaveAsync(existingContrato with { OnedriveExcelPath = PrimaryOneDriveExcelPath });
-}
+        var contratoRepo = app.Services.GetRequiredService<ContratoRepository>();
+        var benRepo = app.Services.GetRequiredService<BeneficiarioRepository>();
+        var syncService = app.Services.GetRequiredService<SyncService>();
 
-var existingBens = await benRepo.GetAllAsync();
-if (existingBens.Count == 0 && File.Exists(excelPath))
-{
-    await syncService.ImportarPlanilhaParaBancoAsync(excelPath);
-}
+        var excelPath = FindFile("CONTROLE PAGAMENTOS.xlsx");
+        var existingContrato = await contratoRepo.GetAsync();
+        if (existingContrato == null)
+        {
+            await contratoRepo.SaveAsync(new ContratoConfig
+            {
+                PagadorNome = "ABIGAIL PAULINO DA SILVA",
+                PagadorCpf = "450.519.504-00",
+                PagadorBanco = "104 - Caixa Econômica Federal",
+                TituloContrato = "Contrato de Promessa de Cessão de Direitos Hereditários",
+                DataContrato = "19 de agosto de 2025",
+                OnedriveExcelPath = File.Exists(PrimaryOneDriveExcelPath) ? PrimaryOneDriveExcelPath : excelPath
+            });
+        }
+        else if (File.Exists(PrimaryOneDriveExcelPath) && existingContrato.OnedriveExcelPath != PrimaryOneDriveExcelPath)
+        {
+            await contratoRepo.SaveAsync(existingContrato with { OnedriveExcelPath = PrimaryOneDriveExcelPath });
+        }
+
+        var existingBens = await benRepo.GetAllAsync();
+        if (existingBens.Count == 0 && File.Exists(excelPath))
+        {
+            await syncService.ImportarPlanilhaParaBancoAsync(excelPath);
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[AppRecibos Api] Erro no seed assíncrono: {ex.Message}");
+    }
+});
 
 // -------------------------------------------------------------
 // ENDPOINTS REST
 // -------------------------------------------------------------
 
-// Healthcheck
-app.MapGet("/api/health", async (ContratoRepository cRepo) =>
+// Healthcheck instantâneo
+app.MapGet("/api/health", () => Results.Ok(new
 {
-    var caminho = await ObterCaminhoPlanilhaAsync(cRepo);
-    return Results.Ok(new
-    {
-        status = "healthy",
-        version = "1.0.0",
-        excelFound = File.Exists(caminho),
-        excelPath = caminho,
-        timestamp = DateTime.UtcNow
-    });
-});
+    status = "healthy",
+    version = "1.0.0",
+    timestamp = DateTime.UtcNow
+}));
 
 // Contrato
 app.MapGet("/api/contrato", async (ContratoRepository repo) =>
@@ -222,7 +229,7 @@ async Task<string> ObterCaminhoPlanilhaAsync(ContratoRepository repo)
         return c.OnedriveExcelPath;
     }
 
-    return excelPath;
+    return FindFile("CONTROLE PAGAMENTOS.xlsx");
 }
 
 app.MapPost("/api/pagamentos/{id}/quitar", async (

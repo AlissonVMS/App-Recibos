@@ -6,20 +6,19 @@ import {
   INITIAL_PAYMENTS,
 } from './data/initialData';
 import { formatarMoeda } from './utils/numberToWordsPtBr';
-import { ReceiptDocument } from './components/ReceiptDocument';
+import { DashboardCharts } from './components/DashboardCharts';
+import {
+  gerarNomeArquivoLote,
+  gerarNomeArquivoRecibo,
+} from './utils/receiptNaming';
+
 import { PaymentModal } from './components/PaymentModal';
 import { BeneficiaryModal } from './components/BeneficiaryModal';
 import { ContractSettingsModal } from './components/ContractSettingsModal';
 import { ContractManagementTab } from './components/ContractManagementTab';
-import { DashboardCharts } from './components/DashboardCharts';
+import { ReceiptDocument } from './components/ReceiptDocument';
 import { ReceiptsBatchPreviewModal } from './components/ReceiptsBatchPreviewModal';
-import {
-  baixarPdfRecibo,
-  baixarPdfRecibosZip,
-  emitirRecibos,
-  gerarNomeArquivoLote,
-  gerarNomeArquivoRecibo,
-} from './utils/pdfGenerator';
+
 import { imprimirElementoRecibo } from './utils/printHelper';
 import { apiService } from './services/apiService';
 import { salvarArquivoNativoOuWeb } from './utils/fileSaver';
@@ -164,6 +163,20 @@ export function App() {
         }
       });
     }
+
+    // Handshake 'react-pronto': notifica o backend nativo (C# / Photino / WebKitGTK) que o React completou
+    // a montagem e renderização inicial do DOM, permitindo que a janela seja revelada instantaneamente sem flash branco
+    requestAnimationFrame(() => {
+      // @ts-ignore
+      if (window.external && window.external.sendMessage) {
+        try {
+          // @ts-ignore
+          window.external.sendMessage('react-pronto');
+        } catch (e) {
+          console.warn('Erro ao enviar handshake react-pronto:', e);
+        }
+      }
+    });
 
     return () => document.removeEventListener('contextmenu', handleContextMenu);
   }, []);
@@ -473,6 +486,7 @@ export function App() {
     const runDownload = async (pay: PaymentRecord) => {
       setDownloadingRowId(pay.id);
       try {
+        const { baixarPdfRecibo } = await import('./utils/pdfGenerator');
         await baixarPdfRecibo(pay, contract);
       } catch (err) {
         console.error('Erro ao baixar recibo:', err);
@@ -515,6 +529,7 @@ export function App() {
     }
     setIsDownloadingBatchZip(true);
     try {
+      const { baixarPdfRecibo, baixarPdfRecibosZip } = await import('./utils/pdfGenerator');
       if (paidPaymentsForEmission.length === 1) {
         await baixarPdfRecibo(paidPaymentsForEmission[0], contract);
       } else {
@@ -1142,8 +1157,7 @@ export function App() {
       {/* Main Content Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* TAB 1: CONTROLE GERAL & BENEFICIÁRIOS */}
-        {activeTab === 'geral' && (
-          <div className="space-y-6">
+        <div className={activeTab === 'geral' ? 'space-y-6' : 'hidden'}>
             {/* Dashboard Executivo de Indicadores Visuais (Fiel ao Excel Controle Geral) */}
             <DashboardCharts
               beneficiaries={beneficiaries}
@@ -1349,11 +1363,9 @@ export function App() {
               })}
             </div>
           </div>
-        )}
 
         {/* TAB 2: REGISTRO DE PAGAMENTOS (TABELA) */}
-        {activeTab === 'tabela' && (
-          <div className="space-y-4">
+        <div className={activeTab === 'tabela' ? 'space-y-4' : 'hidden'}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">
@@ -1994,64 +2006,9 @@ export function App() {
               </div>
             </div>
           </div>
-        )}
 
-        {/* TAB 3: GESTÃO DO CONTRATO & PARTES */}
-        {activeTab === 'exportar' && (
-          <div className="max-w-3xl mx-auto space-y-6">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">Exportação de Dados & Backup</h2>
-              <p className="text-xs text-slate-500">
-                Exporte os dados para Excel, faça backup ou restaure para os dados originais importados
-              </p>
-            </div>
-
-            <div>
-              {/* CSV Export */}
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2.5 mb-1.5">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                      <FileSpreadsheet className="w-4 h-4" />
-                    </div>
-                    <h3 className="font-bold text-slate-900 text-sm">Exportar para Excel / CSV</h3>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Baixe todos os registros de pagamentos formatados em planilha CSV (compatível com Microsoft Excel).
-                  </p>
-                </div>
-                <button
-                  onClick={handleExportCsv}
-                  className="shrink-0 py-2 px-4 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-xs"
-                >
-                  <Download className="w-4 h-4" />
-                  Baixar Planilha CSV
-                </button>
-              </div>
-            </div>
-
-            {/* Reset original data */}
-            <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-5 flex items-start justify-between gap-4">
-              <div>
-                <h4 className="font-bold text-amber-900 text-sm">Restaurar Dados Originais</h4>
-                <p className="text-xs text-amber-800 mt-1">
-                  Restaura todas as parcelas e beneficiários para os dados originais contidos no arquivo{' '}
-                  <span className="font-mono font-semibold">CONTROLE PAGAMENTOS.xlsx</span>.
-                </p>
-              </div>
-              <button
-                onClick={handleResetData}
-                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors border border-amber-300"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Restaurar Planilha
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* TAB: GESTÃO DO CONTRATO & PARTES (NOVA ABA ESPECÍFICA) */}
-        {activeTab === 'contrato' && (
+        {/* TAB 3: GESTÃO DO CONTRATO & PARTES (NOVA ABA ESPECÍFICA) */}
+        <div className={activeTab === 'contrato' ? 'space-y-6' : 'hidden'}>
           <ContractManagementTab
             contract={contract}
             beneficiaries={beneficiaries}
@@ -2075,58 +2032,116 @@ export function App() {
               );
             }}
           />
-        )}
+        </div>
+
+        {/* TAB 4: EXPORTAÇÃO DE DADOS & BACKUP */}
+        <div className={activeTab === 'exportar' ? 'max-w-3xl mx-auto space-y-6' : 'hidden'}>
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Exportação de Dados & Backup</h2>
+            <p className="text-xs text-slate-500">
+              Exporte os dados para Excel, faça backup ou restaure para os dados originais importados
+            </p>
+          </div>
+
+          <div>
+            {/* CSV Export */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2.5 mb-1.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <FileSpreadsheet className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-sm">Exportar para Excel / CSV</h3>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Baixe todos os registros de pagamentos formatados em planilha CSV (compatível com Microsoft Excel).
+                </p>
+              </div>
+              <button
+                onClick={handleExportCsv}
+                className="shrink-0 py-2 px-4 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+              >
+                <Download className="w-4 h-4" />
+                Baixar Planilha CSV
+              </button>
+            </div>
+          </div>
+
+          {/* Reset original data */}
+          <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-5 flex items-start justify-between gap-4">
+            <div>
+              <h4 className="font-bold text-amber-900 text-sm">Restaurar Dados Originais</h4>
+              <p className="text-xs text-amber-800 mt-1">
+                Restaura todas as parcelas e beneficiários para os dados originais contidos no arquivo{' '}
+                <span className="font-mono font-semibold">CONTROLE PAGAMENTOS.xlsx</span>.
+              </p>
+            </div>
+            <button
+              onClick={handleResetData}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors border border-amber-300"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Restaurar Planilha
+            </button>
+          </div>
+        </div>
       </main>
 
       {/* Modals */}
-      <PaymentModal
-        isOpen={isPaymentModalOpen}
-        onClose={() => {
-          setIsPaymentModalOpen(false);
-          setEditingPayment(null);
-        }}
-        onSave={handleSavePayment}
-        onDelete={handleDeletePayment}
-        beneficiaries={beneficiaries}
-        existingPayment={editingPayment}
-        existingPayments={payments}
-      />
+      {isPaymentModalOpen && (
+        <PaymentModal
+          isOpen={isPaymentModalOpen}
+          onClose={() => {
+            setIsPaymentModalOpen(false);
+            setEditingPayment(null);
+          }}
+          onSave={handleSavePayment}
+          onDelete={handleDeletePayment}
+          beneficiaries={beneficiaries}
+          existingPayment={editingPayment}
+          existingPayments={payments}
+        />
+      )}
 
-      <BeneficiaryModal
-        isOpen={isBeneficiaryModalOpen}
-        onClose={() => {
-          setIsBeneficiaryModalOpen(false);
-          setEditingBeneficiary(null);
-        }}
-        beneficiary={editingBeneficiary}
-        onSave={handleSaveBeneficiary}
-      />
+      {isBeneficiaryModalOpen && (
+        <BeneficiaryModal
+          isOpen={isBeneficiaryModalOpen}
+          onClose={() => {
+            setIsBeneficiaryModalOpen(false);
+            setEditingBeneficiary(null);
+          }}
+          beneficiary={editingBeneficiary}
+          onSave={handleSaveBeneficiary}
+        />
+      )}
 
-      <ContractSettingsModal
-        isOpen={isContractModalOpen}
-        onClose={() => setIsContractModalOpen(false)}
-        contract={contract}
-        beneficiaries={beneficiaries}
-        showToast={showToast}
-        requestConfirm={requestConfirm}
-        onSave={(updatedContract, updatedBeneficiaries) => {
-          setContract(updatedContract);
-          setBeneficiaries(
-            updatedBeneficiaries.map((b) => {
-              const benPayments = payments.filter((p) => p.nome === b.nome);
-              const sumPaid = benPayments.reduce((acc, p) => acc + p.valor, 0);
-              const calculatedSaldo = Math.max(0, (Number(b.contrato) || 0) - sumPaid);
-              return {
-                ...b,
-                contrato: Number(b.contrato) || 0,
-                pago: sumPaid,
-                saldo: calculatedSaldo,
-                status: calculatedSaldo === 0 ? 'QUITADO' : 'EM ABERTO',
-              };
-            })
-          );
-        }}
-      />
+      {isContractModalOpen && (
+        <ContractSettingsModal
+          isOpen={isContractModalOpen}
+          onClose={() => setIsContractModalOpen(false)}
+          contract={contract}
+          beneficiaries={beneficiaries}
+          showToast={showToast}
+          requestConfirm={requestConfirm}
+          onSave={(updatedContract, updatedBeneficiaries) => {
+            setContract(updatedContract);
+            setBeneficiaries(
+              updatedBeneficiaries.map((b) => {
+                const benPayments = payments.filter((p) => p.nome === b.nome);
+                const sumPaid = benPayments.reduce((acc, p) => acc + p.valor, 0);
+                const calculatedSaldo = Math.max(0, (Number(b.contrato) || 0) - sumPaid);
+                return {
+                  ...b,
+                  contrato: Number(b.contrato) || 0,
+                  pago: sumPaid,
+                  saldo: calculatedSaldo,
+                  status: calculatedSaldo === 0 ? 'QUITADO' : 'EM ABERTO',
+                };
+              })
+            );
+          }}
+        />
+      )}
 
       {/* Visualização de Recibo em Tela Cheia (Mesmo espaço da janela principal - Tema Claro) */}
       {viewingReceiptPayment && (
@@ -2243,6 +2258,7 @@ export function App() {
                         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
                         setIsDownloadingReceipt(true);
                         try {
+                          const { baixarPdfRecibo } = await import('./utils/pdfGenerator');
                           await baixarPdfRecibo(updated, contract);
                         } finally {
                           setIsDownloadingReceipt(false);
@@ -2253,6 +2269,7 @@ export function App() {
                   }
                   setIsDownloadingReceipt(true);
                   try {
+                    const { baixarPdfRecibo } = await import('./utils/pdfGenerator');
                     await baixarPdfRecibo(viewingReceiptPayment, contract);
                   } finally {
                     setIsDownloadingReceipt(false);
@@ -2381,12 +2398,14 @@ export function App() {
       )}
 
       {/* Modal de Conferência de Recibos antes da Emissão */}
-      <ReceiptsBatchPreviewModal
-        isOpen={isBatchPreviewModalOpen}
-        onClose={() => setIsBatchPreviewModalOpen(false)}
-        selectedPayments={paymentsForEmission}
-        contract={contract}
-      />
+      {isBatchPreviewModalOpen && (
+        <ReceiptsBatchPreviewModal
+          isOpen={isBatchPreviewModalOpen}
+          onClose={() => setIsBatchPreviewModalOpen(false)}
+          selectedPayments={paymentsForEmission}
+          contract={contract}
+        />
+      )}
 
       {/* Notificações Toast Modernas */}
       <ToastContainer toasts={toasts} onClose={removeToast} />

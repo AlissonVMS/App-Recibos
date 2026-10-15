@@ -1,0 +1,169 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AppRecibos.Native.ViewModels"
+        x:Class="AppRecibos.Native.Views.ReceiptPreviewDialog"
+        x:DataType="vm:ReceiptPreviewDialogViewModel"
+        Title="Conferência de Recibos - Emissão Oficial"
+        Width="1060" Height="860"
+        MinWidth="900" MinHeight="650"
+        WindowStartupLocation="CenterOwner"
+        Background="#F1F5F9">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- 1. Header Fiel ao ReceiptsBatchPreviewModal.tsx do React -->
+        <Border Grid.Row="0" Background="White" Padding="16,10" BorderThickness="0,0,0,1" BorderBrush="#E2E8F0">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <!-- Botão Voltar & Identificação -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <Button Command="{Binding CloseCommand}" Classes="ghost" Padding="8,5" CornerRadius="8" Cursor="Hand">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Path Data="M19 12H5 M12 19l-7-7 7-7" Stroke="#475569" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round" Width="14" Height="14"/>
+                            <TextBlock Text="Voltar" FontSize="12" FontWeight="SemiBold" Foreground="#334155" VerticalAlignment="Center"/>
+                            <Border Background="#F1F5F9" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="2,0,0,0">
+                                <TextBlock Text="ESC" FontSize="10" FontFamily="Consolas, monospace" Foreground="#64748B"/>
+                            </Border>
+                        </StackPanel>
+                    </Button>
+
+                    <Rectangle Width="1" Height="20" Fill="#E2E8F0"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Border Width="32" Height="32" CornerRadius="8" Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1">
+                            <Path Data="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8"
+                                  Stroke="#2563EB" StrokeThickness="1.5" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="1">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Conferência de Recibos" FontSize="14" FontWeight="Bold" Foreground="#0F172A"/>
+                                <Border Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" CornerRadius="10" Padding="8,1">
+                                    <TextBlock Text="{Binding PageIndicator}" FontSize="11" FontWeight="Bold" Foreground="#1D4ED8"/>
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="Espaço integral de visualização: confira o teor de cada via antes da emissão definitiva" FontSize="11" Foreground="#64748B"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Botões de Ação Topo Direito -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Command="{Binding PrintAllCommand}" Classes="secondary" Cursor="Hand">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Path Data="M6 9V2h12v7 M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2 M6 14h12v8H6z"
+                                  Stroke="#475569" StrokeThickness="1.5" Stretch="Uniform" Width="14" Height="14"/>
+                            <TextBlock Text="Imprimir" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding DownloadAllCommand}" Classes="primary" Cursor="Hand">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Path Data="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3"
+                                  Stroke="White" StrokeThickness="1.75" Stretch="Uniform" Width="14" Height="14"/>
+                            <TextBlock Text="Baixar PDF / Lote" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 2. Área Central com Barra Lateral de Páginas (se houver múltiplos) e Folha A4 Real -->
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*">
+            <!-- Barra Lateral para Lote de Recibos -->
+            <Border Grid.Column="0" IsVisible="{Binding HasMultipleReceipts}" Width="260" Background="White"
+                    BorderThickness="0,0,1,0" BorderBrush="#E2E8F0">
+                <Grid RowDefinitions="Auto,*">
+                    <Border Grid.Row="0" Background="#F8FAFC" Padding="12,10" BorderThickness="0,0,0,1" BorderBrush="#E2E8F0">
+                        <TextBlock Text="SELEÇÃO DE RECIBOS" FontSize="10" FontWeight="Bold" Foreground="#64748B"/>
+                    </Border>
+                    <ListBox Grid.Row="1" ItemsSource="{Binding ReceiptItems}" SelectedItem="{Binding CurrentReceipt}"
+                             Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ReceiptDisplayItem">
+                                <Border Padding="8,6" CornerRadius="6">
+                                    <Grid RowDefinitions="Auto,Auto">
+                                        <TextBlock Grid.Row="0" Text="{Binding BeneficiarioNome}" FontWeight="Bold" FontSize="12" Foreground="#0F172A"/>
+                                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,2,0,0">
+                                            <TextBlock Grid.Column="0" Text="{Binding ParcelaNumero, StringFormat='Parcela nº {0}'}" FontSize="11" Foreground="#2563EB" FontWeight="SemiBold"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding ValorFormatado}" FontSize="11" FontWeight="Bold" Foreground="#059669"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <!-- Folha A4 Centralizada -->
+            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="30">
+                <Border Background="White" Width="760" MinHeight="1075" CornerRadius="2"
+                        BorderBrush="#CBD5E1" BorderThickness="1"
+                        HorizontalAlignment="Center" VerticalAlignment="Top"
+                        Margin="0,0,0,30">
+                    <Border.BoxShadow>
+                        0 10 25 0 #20000000
+                    </Border.BoxShadow>
+
+                    <!-- Conteúdo A4: 30mm topo e esquerda, 20mm direita e inferior -->
+                    <StackPanel Margin="60,60,40,40" TextElement.FontFamily="Times New Roman, Times, serif" TextElement.Foreground="#000000">
+                        <!-- TÍTULO: Recibo de Pagamento (14pt, negrito, centralizado) -->
+                        <TextBlock Text="Recibo de Pagamento" FontSize="18" FontWeight="Bold" TextAlignment="Center" Margin="0,0,0,24"/>
+
+                        <!-- 1ª VIA (12pt, negrito, alinhado à direita) -->
+                        <TextBlock Text="1ª VIA" FontSize="15" FontWeight="Bold" TextAlignment="Right" Margin="0,0,0,40"/>
+
+                        <!-- Parágrafo Declaratório: Eu, ... -->
+                        <TextBlock FontSize="15" TextWrapping="Wrap" LineHeight="24" Margin="0,0,0,20">
+                            <Run Text="Eu, "/><Run Text="{Binding CurrentReceipt.BeneficiarioNome}" FontWeight="Bold"/><Run Text=", inscrito(a) no CPF nº "/><Run Text="{Binding CurrentReceipt.BeneficiarioCpf}" FontWeight="Bold"/><Run Text=", declaro que recebi de "/><Run Text="{Binding CurrentReceipt.Contrato.PagadorNome}" FontWeight="Bold"/><Run Text=", CPF nº "/><Run Text="{Binding CurrentReceipt.Contrato.PagadorCpf}" FontWeight="Bold"/><Run Text=", a quantia de "/><Run Text="{Binding CurrentReceipt.ValorFormatado, StringFormat='{}R$ {0}'}" FontWeight="Bold"/><Run Text=" ("/><Run Text="{Binding CurrentReceipt.ValorExtenso}" FontWeight="Bold"/><Run Text="), no dia "/><Run Text="{Binding CurrentReceipt.DataPtBr}" FontWeight="Bold"/><Run Text=", referente à "/><Run Text="{Binding CurrentReceipt.ParcelaNumero, StringFormat='{}parcela nº {0}'}" FontWeight="Bold"/><Run Text=" do "/><Run Text="{Binding CurrentReceipt.TituloContratoLimpo}" FontWeight="Bold"/><Run Text=", firmado em "/><Run Text="19 de agosto de 2025" FontWeight="Bold"/><Run Text="."/>
+                        </TextBlock>
+
+                        <!-- Parágrafo Forma de Pagamento / Pix -->
+                        <TextBlock FontSize="15" TextWrapping="Wrap" LineHeight="24" Margin="0,0,0,20">
+                            <Run Text="{Binding CurrentReceipt.FormaPagamentoDescricao}"/>
+                        </TextBlock>
+
+                        <!-- Parágrafo Saldo Devedor Restante -->
+                        <TextBlock FontSize="15" TextWrapping="Wrap" LineHeight="24" Margin="0,0,0,20">
+                            <Run Text="Após este pagamento, o saldo devedor atualizado referente à minha parte é de "/><Run Text="{Binding CurrentReceipt.SaldoFormatado, StringFormat='{}R$ {0}'}" FontWeight="Bold"/><Run Text=" ("/><Run Text="{Binding CurrentReceipt.SaldoExtenso}" FontWeight="Bold"/><Run Text=")."/>
+                        </TextBlock>
+
+                        <!-- Parágrafo Quitação Plena -->
+                        <TextBlock FontSize="15" TextWrapping="Wrap" LineHeight="24" Margin="0,0,0,50">
+                            <Run Text="Para maior clareza, firmo o presente recibo, que comprova o recebimento integral do valor mencionado, concedendo "/><Run Text="quitação plena, geral e irrevogável" FontWeight="Bold"/><Run Text=" pela quantia recebida."/>
+                        </TextBlock>
+
+                        <!-- Local e Data por Extenso (Direita) -->
+                        <TextBlock Text="{Binding CurrentReceipt.LocalDataExtenso}" FontSize="15" FontWeight="Bold" TextAlignment="Right" Margin="0,0,0,100"/>
+
+                        <!-- Linha de Assinatura -->
+                        <Rectangle Width="600" Height="1" Fill="#000000" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+
+                        <!-- Nome e CPF do Beneficiário Centralizados -->
+                        <TextBlock Text="{Binding CurrentReceipt.BeneficiarioNome}" FontSize="15" FontWeight="Bold" TextAlignment="Center"/>
+                        <TextBlock Text="{Binding CurrentReceipt.BeneficiarioCpf, StringFormat='CPF: {0}'}" FontSize="14" TextAlignment="Center" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- 3. Barra Inferior de Paginação (se houver múltiplos) -->
+        <Border Grid.Row="2" Background="White" Padding="20,10" BorderThickness="0,1,0,0" BorderBrush="#E2E8F0">
+            <Grid ColumnDefinitions="*,Auto,*">
+                <Button Grid.Column="0" Command="{Binding PrevCommand}" IsEnabled="{Binding CanGoPrev}" Classes="secondary" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Path Data="M15 19l-7-7 7-7" Stroke="#475569" StrokeThickness="2" Width="12" Height="12"/>
+                        <TextBlock Text="Anterior" FontSize="12"/>
+                    </StackPanel>
+                </Button>
+
+                <TextBlock Grid.Column="1" Text="{Binding PageIndicator}" FontWeight="Bold" FontSize="12" Foreground="#334155" VerticalAlignment="Center"/>
+
+                <Button Grid.Column="2" Command="{Binding NextCommand}" IsEnabled="{Binding CanGoNext}" Classes="secondary" HorizontalAlignment="Right">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="Próximo" FontSize="12"/>
+                        <Path Data="M9 5l7 7-7 7" Stroke="#475569" StrokeThickness="2" Width="12" Height="12"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

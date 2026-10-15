@@ -1,5 +1,7 @@
 using System.IO;
 using System.Net.Http;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Photino.NET;
 
@@ -7,9 +9,76 @@ namespace AppRecibos.Desktop;
 
 public class Program
 {
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GdkRGBA
+    {
+        public double Red;
+        public double Green;
+        public double Blue;
+        public double Alpha;
+    }
+
+    [DllImport("libwebkit2gtk-4.1.so.0", EntryPoint = "webkit_web_view_set_background_color", SetLastError = false)]
+    private static extern void webkit_web_view_set_background_color_41(IntPtr webView, ref GdkRGBA rgba);
+
+    [DllImport("libwebkit2gtk-4.0.so.37", EntryPoint = "webkit_web_view_set_background_color", SetLastError = false)]
+    private static extern void webkit_web_view_set_background_color_40(IntPtr webView, ref GdkRGBA rgba);
+
+    [DllImport("libgtk-3.so.0", SetLastError = false)]
+    private static extern void gtk_widget_set_opacity(IntPtr widget, double opacity);
+
+    private static (IntPtr gtkWindow, IntPtr webView) GetNativeGtkPointers(PhotinoWindow window)
+    {
+        try
+        {
+            var nativeField = typeof(PhotinoWindow).GetField("_nativeInstance", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (nativeField?.GetValue(window) is IntPtr nativeInst && nativeInst != IntPtr.Zero)
+            {
+                // Linux x64 Photino:
+                // offset 0x110 = GtkWidget* (GtkWindow)
+                // offset 0xc8  = WebKitWebView*
+                IntPtr gtkWindow = Marshal.ReadIntPtr(nativeInst + 0x110);
+                IntPtr webView = Marshal.ReadIntPtr(nativeInst + 0xc8);
+                return (gtkWindow, webView);
+            }
+        }
+        catch { }
+        return (IntPtr.Zero, IntPtr.Zero);
+    }
+
+    private static void SetWebKitBackgroundColor(IntPtr webView, double r, double g, double b, double a)
+    {
+        var color = new GdkRGBA { Red = r, Green = g, Blue = b, Alpha = a };
+        try
+        {
+            webkit_web_view_set_background_color_41(webView, ref color);
+        }
+        catch (DllNotFoundException)
+        {
+            try
+            {
+                webkit_web_view_set_background_color_40(webView, ref color);
+            }
+            catch { }
+        }
+        catch { }
+    }
+
+    private static void SetGtkOpacity(IntPtr widget, double opacity)
+    {
+        try
+        {
+            gtk_widget_set_opacity(widget, opacity);
+        }
+        catch { }
+    }
+
     [STAThread]
     public static void Main(string[] args)
     {
+        // Otimização Linux: desativa DMA-BUF renderer no WebKitGTK para eliminar o atraso de inicialização do driver gráfico
+        Environment.SetEnvironmentVariable("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+
         Console.WriteLine("[App-Recibos Desktop] Iniciando backend C# .NET 9...");
 
         // 1. Inicia o backend ASP.NET Core em background
@@ -36,57 +105,14 @@ public class Program
             return;
         }
 
-        // 2. Aguarda a API subir respondendo no healthcheck (polling ágil de 20ms para inicialização instantânea)
-        var httpClient = new HttpClient { Timeout = TimeSpan.FromMilliseconds(300) };
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        while (sw.ElapsedMilliseconds < 10000)
-        {
-            try
-            {
-                var res = httpClient.GetAsync("http://127.0.0.1:5000/api/health").GetAwaiter().GetResult();
-                if (res.IsSuccessStatusCode)
-                {
-                    Console.WriteLine($"[App-Recibos Desktop] Backend conectado com sucesso na porta 5000 ({sw.ElapsedMilliseconds}ms).");
-                    break;
-                }
-            }
-            catch
-            {
-                Thread.Sleep(20);
-            }
-        }
-
-        // 3. Determina a URL inicial da interface
         string targetUrl = "http://127.0.0.1:5000";
-        bool devRequested = args.Contains("--dev");
-
-        if (devRequested)
-        {
-            try
-            {
-                var res = httpClient.GetAsync("http://localhost:3000").GetAwaiter().GetResult();
-                if (res.IsSuccessStatusCode)
-                {
-                    targetUrl = "http://localhost:3000";
-                    Console.WriteLine($"[App-Recibos Desktop] Modo Desenvolvimento: Conectando ao Vite em {targetUrl}");
-                }
-            }
-            catch
-            {
-                Console.WriteLine("[App-Recibos Desktop] Dev server não respondeu; usando backend local em http://127.0.0.1:5000");
-            }
-        }
-        else
-        {
-            Console.WriteLine($"[App-Recibos Desktop] Interface integrada ativa em: {targetUrl}");
-        }
-
-        // 4. Cria e exibe a janela nativa Photino
-        Console.WriteLine("[App-Recibos Desktop] Abrindo janela nativa leve Photino...");
+        var httpClient = new HttpClient { Timeout = TimeSpan.FromMilliseconds(200) };
         string lastSaveDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         
         try
         {
+            // 2. Cria a janela nativa Photino IMEDIATAMENTE (em paralelo ao boot do backend)
+            Console.WriteLine("[App-Recibos Desktop] Inicializando janela nativa Photino...");
             string baseDir = AppContext.BaseDirectory;
             string iconName = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)
                 ? "app-icon.ico" 
@@ -102,12 +128,75 @@ public class Program
                 .SetResizable(true)
                 .SetContextMenuEnabled(false)
                 .SetDevToolsEnabled(false)
+                .SetLogVerbosity(0)
                 .SetGrantBrowserPermissions(true);
+
+            IntPtr nativeGtkWindow = IntPtr.Zero;
+            bool isWindowShown = false;
+            var showLock = new object();
+
+            void ShowWindowOnce()
+            {
+                lock (showLock)
+                {
+                    if (isWindowShown) return;
+                    isWindowShown = true;
+                }
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    try
+                    {
+                        window.Invoke(() =>
+                        {
+                            if (nativeGtkWindow == IntPtr.Zero)
+                            {
+                                var (gtkWin, _) = GetNativeGtkPointers(window);
+                                nativeGtkWindow = gtkWin;
+                            }
+                            if (nativeGtkWindow != IntPtr.Zero)
+                            {
+                                SetGtkOpacity(nativeGtkWindow, 1.0);
+                                Console.WriteLine("[App-Recibos Desktop] Janela exibida instantaneamente (100% pronta, 0ms flash).");
+                            }
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[App-Recibos Desktop] Erro ao exibir janela: {ex.Message}");
+                    }
+                }
+            }
+
+            window.RegisterWindowCreatedHandler((sender, e) =>
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    var (gtkWin, webView) = GetNativeGtkPointers(window);
+                    nativeGtkWindow = gtkWin;
+                    if (gtkWin != IntPtr.Zero)
+                    {
+                        // Começa com opacidade 0 para evitar o frame branco preliminar do WebKitGTK
+                        SetGtkOpacity(gtkWin, 0.0);
+                    }
+                    if (webView != IntPtr.Zero)
+                    {
+                        // Define cor de fundo nativa do WebKitGTK para dark slate (#0f172a)
+                        SetWebKitBackgroundColor(webView, 15.0 / 255.0, 23.0 / 255.0, 42.0 / 255.0, 1.0);
+                    }
+                }
+            });
 
             window.RegisterWebMessageReceivedHandler((sender, message) =>
             {
                 var w = sender as PhotinoWindow ?? window;
                 if (w == null) return;
+
+                // Handshake do React quando o DOM inicial estiver 100% montado e renderizado
+                if (message == "react-pronto")
+                {
+                    ShowWindowOnce();
+                    return;
+                }
 
                 // Executa completamente em Task.Run para liberar imediatamente a thread principal do GTK
                 Task.Run(async () =>
@@ -264,6 +353,57 @@ public class Program
                     }
                 });
             });
+
+            // 3. Aguarda o backend responder no healthcheck (ultra-rápido, executado em paralelo)
+            bool devRequested = args.Contains("--dev");
+
+            if (devRequested)
+            {
+                try
+                {
+                    var res = httpClient.GetAsync("http://localhost:3000").GetAwaiter().GetResult();
+                    if (res.IsSuccessStatusCode)
+                    {
+                        targetUrl = "http://localhost:3000";
+                        Console.WriteLine($"[App-Recibos Desktop] Modo Dev: Conectando a {targetUrl}");
+                    }
+                }
+                catch { }
+            }
+
+            if (targetUrl.StartsWith("http://127.0.0.1:5000"))
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                while (sw.ElapsedMilliseconds < 5000)
+                {
+                    try
+                    {
+                        var res = httpClient.GetAsync("http://127.0.0.1:5000/api/health").GetAwaiter().GetResult();
+                        if (res.IsSuccessStatusCode)
+                        {
+                            Console.WriteLine($"[App-Recibos Desktop] Backend pronto em {sw.ElapsedMilliseconds}ms.");
+                            break;
+                        }
+                    }
+                    catch
+                    {
+                        Thread.Sleep(5);
+                    }
+                }
+
+                // 4. Pré-aquece o cache de arquivos estáticos e as rotas de banco antes de exibir a janela
+                try
+                {
+                    _ = httpClient.GetStringAsync("http://127.0.0.1:5000/").GetAwaiter().GetResult();
+                    _ = httpClient.GetStringAsync("http://127.0.0.1:5000/api/pagamentos").GetAwaiter().GetResult();
+                    _ = httpClient.GetStringAsync("http://127.0.0.1:5000/api/contrato").GetAwaiter().GetResult();
+                    _ = httpClient.GetStringAsync("http://127.0.0.1:5000/api/beneficiarios").GetAwaiter().GetResult();
+                }
+                catch { }
+            }
+
+            // Fallback de segurança: se o handshake react-pronto demorar mais de 2s, revela a janela para evitar travamentos
+            Task.Delay(2000).ContinueWith(_ => ShowWindowOnce());
 
             window.Load(targetUrl);
             window.WaitForClose();
