@@ -46,6 +46,12 @@ public partial class PaymentDialogViewModel : ViewModelBase
     [ObservableProperty]
     private string _errorMessage = string.Empty;
 
+    public bool IsEditing { get; }
+    public string DialogTitle => IsEditing ? $"Editar Parcela nº {ParcelaNumero}" : "Registrar Novo Pagamento";
+    public string DialogSubtitle => IsEditing 
+        ? (SelectedBeneficiario != null ? $"Cedente: {SelectedBeneficiario.Nome}" : "Dados financeiros da parcela") 
+        : "Dados financeiros da parcela vinculados ao cadastro do cedente";
+
     public bool IsConfirmed { get; private set; }
 
     public event Action? RequestClose;
@@ -53,6 +59,7 @@ public partial class PaymentDialogViewModel : ViewModelBase
     public PaymentDialogViewModel(ObservableCollection<Beneficiario> beneficiarios, Pagamento? existing = null)
     {
         Beneficiarios = beneficiarios;
+        IsEditing = existing != null;
 
         if (existing != null)
         {

@@ -272,9 +272,147 @@
             <Setter Property="Background" Value="#FEE2E2"/>
             <Setter Property="Foreground" Value="#B91C1C"/>
         </Style>
+        <!-- CheckBox Estilo Tailwind React (15x15, cantos 2.5px, borda sutil, azul sólido) -->
+        <Style Selector="CheckBox">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="8,0,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Grid x:Name="RootGrid" ColumnDefinitions="Auto,*" Background="Transparent">
+                        <Border x:Name="NormalRectangle"
+                                Width="15" Height="15"
+                                CornerRadius="2.5"
+                                BorderThickness="1"
+                                BorderBrush="{DynamicResource CheckBoxCheckBackgroundStrokeUnchecked}"
+                                Background="{DynamicResource CheckBoxCheckBackgroundFillUnchecked}"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center">
+                            <Path x:Name="CheckGlyph"
+                                  Data="M3.5 7.5L6 10L11.5 4.5"
+                                  Stroke="White"
+                                  StrokeThickness="1.75"
+                                  StrokeLineCap="Round"
+                                  StrokeJoin="Round"
+                                  Stretch="Uniform"
+                                  Width="9" Height="9"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  IsVisible="False"/>
+                        </Border>
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                          Grid.Column="1"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          IsVisible="{TemplateBinding Content, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="CheckBox:pointerover /template/ Border#NormalRectangle">
+            <Setter Property="BorderBrush" Value="#94A3B8"/>
+            <Setter Property="Background" Value="#F8FAFC"/>
+        </Style>
+        <Style Selector="CheckBox:checked /template/ Border#NormalRectangle">
+            <Setter Property="Background" Value="#2563EB"/>
+            <Setter Property="BorderBrush" Value="#2563EB"/>
+        </Style>
+        <Style Selector="CheckBox:checked /template/ Path#CheckGlyph">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="CheckBox:checked:pointerover /template/ Border#NormalRectangle">
+            <Setter Property="Background" Value="#1D4ED8"/>
+            <Setter Property="BorderBrush" Value="#1D4ED8"/>
+        </Style>
+
+        <!-- ComboBox Estilo Tailwind React (8px cantos, fundo sutil) -->
+        <Style Selector="ComboBox">
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style Selector="ComboBox:pointerover">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+        </Style>
+        <Style Selector="ComboBox:focus">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#2563EB"/>
+        </Style>
+
+        <!-- DataGrid Cabeçalhos, Linhas e Células 1:1 ao React -->
+        <Style Selector="DataGridColumnHeader">
+            <Setter Property="Background" Value="#F1F5F9"/>
+            <Setter Property="Foreground" Value="#475569"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="4,6,4,6"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        </Style>
+        <Style Selector="DataGridColumnHeader:pointerover">
+            <Setter Property="Background" Value="#E2E8F0"/>
+        </Style>
+        <Style Selector="DataGridColumnHeader Path#SortIcon">
+            <Setter Property="IsVisible" Value="False"/>
+            <Setter Property="Width" Value="0"/>
+        </Style>
+        <Style Selector="DataGridCell">
+            <Setter Property="Focusable" Value="False"/>
+        </Style>
+        <Style Selector="DataGridCell:focus">
+            <Setter Property="FocusAdorner" Value="{x:Null}"/>
+        </Style>
+        <Style Selector="DataGridRow:selected /template/ Rectangle#BackgroundRectangle">
+            <Setter Property="Fill" Value="#EFF6FF"/>
+        </Style>
+        <Style Selector="DataGridRow:selected:pointerover /template/ Rectangle#BackgroundRectangle">
+            <Setter Property="Fill" Value="#DBEAFE"/>
+        </Style>
+        <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
+            <Setter Property="Fill" Value="#F8FAFC"/>
+        </Style>
     </Application.Styles>
 
     <Application.Resources>
+        <!-- DataGrid Sort Icon MinWidth Overridden to 0 to prevent text clipping -->
+        <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>
+
+        <!-- DataGrid Brushes Globais para Linha Selecionada e Hover 1:1 ao React -->
+        <SolidColorBrush x:Key="DataGridRowSelectedBackgroundBrush" Color="#EFF6FF" />
+        <SolidColorBrush x:Key="DataGridRowSelectedHoveredBackgroundBrush" Color="#DBEAFE" />
+        <SolidColorBrush x:Key="DataGridRowSelectedUnfocusedBackgroundBrush" Color="#EFF6FF" />
+        <SolidColorBrush x:Key="DataGridRowSelectedHoveredUnfocusedBackgroundBrush" Color="#DBEAFE" />
+        <SolidColorBrush x:Key="DataGridRowHoveredBackgroundBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="DataGridCellFocusVisualPrimaryBrush" Color="Transparent" />
+        <SolidColorBrush x:Key="DataGridCellFocusVisualSecondaryBrush" Color="Transparent" />
+        <SolidColorBrush x:Key="DataGridCurrencyVisualPrimaryBrush" Color="Transparent" />
+        <SolidColorBrush x:Key="DataGridGridLinesBrush" Color="#F1F5F9" />
+        <SolidColorBrush x:Key="DataGridColumnHeaderBackgroundBrush" Color="#F1F5F9" />
+        <SolidColorBrush x:Key="DataGridColumnHeaderForegroundBrush" Color="#475569" />
+        <SolidColorBrush x:Key="DataGridFillerColumnGridLinesBrush" Color="Transparent" />
+
+        <!-- CheckBox Brushes Globais 1:1 ao React -->
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUnchecked" Color="White" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#CBD5E1" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPointerOver" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#94A3B8" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#2563EB" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#2563EB" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#1D4ED8" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#1D4ED8" />
+        <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="White" />
+        <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="White" />
+
         <SolidColorBrush x:Key="SlateDarkBrush" Color="#0F172A" />
         <SolidColorBrush x:Key="SlateHeaderBrush" Color="#1E293B" />
         <SolidColorBrush x:Key="SlateBackgroundBrush" Color="#F8FAFC" />

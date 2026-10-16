@@ -20,68 +20,38 @@ public partial class MainWindow : Window
 
         if (DataContext is MainWindowViewModel vm)
         {
-            vm.OnRequestPaymentDialog = async (existing) =>
-            {
-                var dialogVm = new PaymentDialogViewModel(vm.Beneficiarios, existing);
-                var dialog = new PaymentDialog(dialogVm);
-                var isOk = await dialog.ShowDialog<bool>(this);
-                if (isOk)
-                {
-                    var novoPag = dialogVm.ToPagamento();
-                    // Salva no repositório SQLite
-                    try
-                    {
-                        var repo = new AppRecibos.Core.Infrastructure.Data.Repositories.PagamentoRepository(
-                            new AppRecibos.Core.Infrastructure.Data.SqliteDbConnectionFactory());
-                        
-                        await repo.SaveAsync(novoPag);
-                        return true;
-                    }
-                    catch (Exception ex)
-                    {
-                        vm.ShowNotification($"Erro ao salvar no SQLite: {ex.Message}", "error");
-                        return false;
-                    }
-                }
-                return false;
-            };
-
-            vm.OnRequestBeneficiaryDialog = async (beneficiario) =>
-            {
-                var dialogVm = new BeneficiaryDialogViewModel(beneficiario, vm.Contrato);
-                var dialog = new BeneficiaryDialog(dialogVm);
-                var isOk = await dialog.ShowDialog<bool>(this);
-                if (isOk)
-                {
-                    var updated = dialogVm.ToUpdatedBeneficiario();
-                    try
-                    {
-                        var repo = new AppRecibos.Core.Infrastructure.Data.Repositories.BeneficiarioRepository(
-                            new AppRecibos.Core.Infrastructure.Data.SqliteDbConnectionFactory());
-                        await repo.SaveAsync(updated);
-                        return true;
-                    }
-                    catch (Exception ex)
-                    {
-                        vm.ShowNotification($"Erro ao salvar beneficiário: {ex.Message}", "error");
-                        return false;
-                    }
-                }
-                return false;
-            };
-
-            // Emissão de recibos ocorre dentro da própria janela principal em overlay A4 (1:1 ao React, sem nova janela do SO)
+            // Modais e Diálogos ocorrem dentro da própria janela principal em overlay (1:1 ao React, sem novas janelas do SO)
+            vm.OnRequestPaymentDialog = null;
+            vm.OnRequestBeneficiaryDialog = null;
             vm.OnRequestReceiptPreviewDialog = null;
 
-            // Tecla ESC fecha a conferência de recibo e retorna imediatamente à tabela de pagamentos
+            // Tecla ESC fecha qualquer modal/overlay aberto e retorna imediatamente à janela principal
             AddHandler(KeyDownEvent, (s, e) =>
             {
                 if (e.Key == Avalonia.Input.Key.Escape)
                 {
-                    if (DataContext is MainWindowViewModel mvm && mvm.IsReceiptPreviewOpen)
+                    if (DataContext is MainWindowViewModel mvm)
                     {
-                        mvm.CloseReceiptPreviewCommand.Execute(null);
-                        e.Handled = true;
+                        if (mvm.IsConfirmDialogOpen)
+                        {
+                            mvm.CancelConfirmCommand.Execute(null);
+                            e.Handled = true;
+                        }
+                        else if (mvm.IsPaymentDialogOpen)
+                        {
+                            mvm.ClosePaymentDialogCommand.Execute(null);
+                            e.Handled = true;
+                        }
+                        else if (mvm.IsBeneficiaryDialogOpen)
+                        {
+                            mvm.CloseBeneficiaryDialogCommand.Execute(null);
+                            e.Handled = true;
+                        }
+                        else if (mvm.IsReceiptPreviewOpen)
+                        {
+                            mvm.CloseReceiptPreviewCommand.Execute(null);
+                            e.Handled = true;
+                        }
                     }
                 }
             }, Avalonia.Interactivity.RoutingStrategies.Tunnel);

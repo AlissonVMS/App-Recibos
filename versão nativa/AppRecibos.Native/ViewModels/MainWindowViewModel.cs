@@ -100,16 +100,16 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _searchQuery = string.Empty;
 
     [ObservableProperty]
-    private string _selectedBeneficiarioFilter = "Todos";
+    private string _selectedBeneficiarioFilter = "Todos os Beneficiários";
 
     [ObservableProperty]
-    private string _selectedStatusFilter = "Todos";
+    private string _selectedStatusFilter = "Status: Todos";
 
     [ObservableProperty]
-    private ObservableCollection<string> _beneficiarioFilterOptions = new() { "Todos" };
+    private ObservableCollection<string> _beneficiarioFilterOptions = new() { "Todos os Beneficiários" };
 
     [ObservableProperty]
-    private ObservableCollection<string> _statusFilterOptions = new() { "Todos", "PAGO", "PREVISTO" };
+    private ObservableCollection<string> _statusFilterOptions = new() { "Status: Todos", "Somente Pagos", "Somente Previstos" };
 
     // --- Totais e Contadores para Barra de Ferramentas ---
     [ObservableProperty]
@@ -130,6 +130,11 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private int _visiblePrevistoCount = 0;
 
+    public string EmitirRecibosButtonText =>
+        TotalPaidCount > 1 ? $"Emitir Recibos ({TotalPaidCount})" :
+        TotalPaidCount == 1 ? "Emitir Recibo (1)" :
+        "Emitir Recibo";
+
     // --- Métricas de Seleção Ativa ---
     public int SelectedCount => DisplayPagamentos.Count(p => p.IsSelected);
     public int SelectedPaidCount => DisplayPagamentos.Count(p => p.IsSelected && p.IsPago);
@@ -139,7 +144,19 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool HasSelectedPayments => SelectedCount > 0;
     public bool HasSelectedPaid => SelectedPaidCount > 0;
     public bool HasSelectedPrevisto => SelectedPrevistoCount > 0;
-    public bool IsAllSelected => DisplayPagamentos.Count > 0 && DisplayPagamentos.All(p => p.IsSelected);
+    public bool IsAllSelected
+    {
+        get => DisplayPagamentos.Count > 0 && DisplayPagamentos.All(p => p.IsSelected);
+        set
+        {
+            foreach (var item in DisplayPagamentos)
+            {
+                item.IsSelected = value;
+            }
+            OnItemSelectionChanged();
+            OnPropertyChanged(nameof(IsAllSelected));
+        }
+    }
 
     // --- Estado do Visualizador de Folha A4 (Recibo Legal) ---
     [ObservableProperty]
@@ -238,6 +255,19 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private Func<Task>? _confirmAction;
 
+    // --- Estado dos Modais In-Window (100% integrados à janela principal) ---
+    [ObservableProperty]
+    private bool _isPaymentDialogOpen;
+
+    [ObservableProperty]
+    private PaymentDialogViewModel? _paymentDialogVm;
+
+    [ObservableProperty]
+    private bool _isBeneficiaryDialogOpen;
+
+    [ObservableProperty]
+    private BeneficiaryDialogViewModel? _beneficiaryDialogVm;
+
     // --- Notificações Toast ---
     [ObservableProperty]
     private string _notificationMessage = string.Empty;
@@ -297,7 +327,7 @@ public partial class MainWindowViewModel : ViewModelBase
             }
 
             BeneficiarioFilterOptions.Clear();
-            BeneficiarioFilterOptions.Add("Todos");
+            BeneficiarioFilterOptions.Add("Todos os Beneficiários");
             foreach (var b in bens)
             {
                 BeneficiarioFilterOptions.Add(b.Nome);
@@ -342,6 +372,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(TotalPagoFormatado));
         OnPropertyChanged(nameof(TotalComprometidoFormatado));
+        OnPropertyChanged(nameof(EmitirRecibosButtonText));
+
+        // Atualiza contadores dinâmicos nas opções de filtro
+        StatusFilterOptions.Clear();
+        StatusFilterOptions.Add("Status: Todos");
+        StatusFilterOptions.Add($"Somente Pagos ({TotalPaidCount})");
+        StatusFilterOptions.Add($"Somente Previstos ({TotalPrevistoCount})");
 
         UpdateBeneficiarioCards();
     }
@@ -353,7 +390,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             var card = new BeneficiarioCardViewModel(b, _allPagamentos)
             {
-                OpenEditCallback = (ben) => _ = OpenEditBeneficiaryAsync(ben),
+                OpenEditCallback = (ben) => OpenEditBeneficiary(ben),
                 NavigateToPaymentsCallback = (nome) => NavigateToCedentePayments(nome),
                 CopyPixCallback = (chave) => _ = CopyPixAsync(chave)
             };
@@ -386,16 +423,22 @@ public partial class MainWindowViewModel : ViewModelBase
                 (p.DataPrevista != null && p.DataPrevista.Contains(q)));
         }
 
-        if (!string.IsNullOrWhiteSpace(SelectedBeneficiarioFilter) && SelectedBeneficiarioFilter != "Todos")
+        if (!string.IsNullOrWhiteSpace(SelectedBeneficiarioFilter) && 
+            SelectedBeneficiarioFilter != "Todos" && 
+            SelectedBeneficiarioFilter != "Todos os Beneficiários")
         {
             filtered = filtered.Where(p => p.BeneficiarioNome.Equals(SelectedBeneficiarioFilter, StringComparison.OrdinalIgnoreCase));
         }
 
-        if (!string.IsNullOrWhiteSpace(SelectedStatusFilter) && SelectedStatusFilter != "Todos")
+        if (!string.IsNullOrWhiteSpace(SelectedStatusFilter) && 
+            SelectedStatusFilter != "Todos" && 
+            SelectedStatusFilter != "Status: Todos")
         {
-            if (SelectedStatusFilter.Equals("PAGO", StringComparison.OrdinalIgnoreCase))
+            if (SelectedStatusFilter.StartsWith("Somente Pagos", StringComparison.OrdinalIgnoreCase) ||
+                SelectedStatusFilter.Equals("PAGO", StringComparison.OrdinalIgnoreCase))
                 filtered = filtered.Where(p => p.Status == StatusParcela.Pago);
-            else if (SelectedStatusFilter.Equals("PREVISTO", StringComparison.OrdinalIgnoreCase))
+            else if (SelectedStatusFilter.StartsWith("Somente Previstos", StringComparison.OrdinalIgnoreCase) ||
+                     SelectedStatusFilter.Equals("PREVISTO", StringComparison.OrdinalIgnoreCase))
                 filtered = filtered.Where(p => p.Status == StatusParcela.Previsto);
         }
 
@@ -405,7 +448,7 @@ public partial class MainWindowViewModel : ViewModelBase
             itemVm.SelectionChangedCallback = _ => OnItemSelectionChanged();
             itemVm.ToggleStatusCallback = vm => ToggleStatus(vm);
             itemVm.OpenPreviewCallback = vm => _ = OpenSingleReceiptPreviewAsync(vm);
-            itemVm.EditCallback = vm => _ = EditPaymentAsync(vm);
+            itemVm.EditCallback = vm => EditPayment(vm);
             itemVm.DeleteCallback = vm => DeletePayment(vm);
             return itemVm;
         }).ToList();
@@ -627,18 +670,36 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task OpenEditBeneficiaryAsync(Beneficiario? b)
+    private void OpenEditBeneficiary(Beneficiario? b)
     {
         if (b == null) return;
-        if (OnRequestBeneficiaryDialog != null)
+        var vm = new BeneficiaryDialogViewModel(b, Contrato);
+        vm.RequestClose += async () =>
         {
-            var ok = await OnRequestBeneficiaryDialog.Invoke(b);
-            if (ok)
+            if (vm.IsConfirmed)
             {
-                await LoadInitialDataAsync();
-                ShowNotification("Dados bancários e do cedente atualizados com sucesso!", "success");
+                try
+                {
+                    var updated = vm.ToUpdatedBeneficiario();
+                    await _beneficiarioRepo.SaveAsync(updated);
+                    await LoadInitialDataAsync();
+                    ShowNotification("Dados bancários e do cedente atualizados com sucesso!", "success");
+                }
+                catch (Exception ex)
+                {
+                    ShowNotification($"Erro ao salvar cedente: {ex.Message}", "error");
+                }
             }
-        }
+            IsBeneficiaryDialogOpen = false;
+        };
+        BeneficiaryDialogVm = vm;
+        IsBeneficiaryDialogOpen = true;
+    }
+
+    [RelayCommand]
+    private void CloseBeneficiaryDialog()
+    {
+        IsBeneficiaryDialogOpen = false;
     }
 
     [RelayCommand]
@@ -1062,32 +1123,62 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task OpenNewPaymentAsync()
+    private void OpenNewPayment()
     {
-        if (OnRequestPaymentDialog != null)
+        var vm = new PaymentDialogViewModel(Beneficiarios, null);
+        vm.RequestClose += async () =>
         {
-            var result = await OnRequestPaymentDialog.Invoke(null);
-            if (result)
+            if (vm.IsConfirmed)
             {
-                await LoadInitialDataAsync();
-                ShowNotification("Pagamento cadastrado com sucesso!", "success");
+                try
+                {
+                    var p = vm.ToPagamento();
+                    await _pagamentoRepo.SaveAsync(p);
+                    await LoadInitialDataAsync();
+                    ShowNotification("Pagamento cadastrado com sucesso!", "success");
+                }
+                catch (Exception ex)
+                {
+                    ShowNotification($"Erro ao salvar pagamento: {ex.Message}", "error");
+                }
             }
-        }
+            IsPaymentDialogOpen = false;
+        };
+        PaymentDialogVm = vm;
+        IsPaymentDialogOpen = true;
     }
 
     [RelayCommand]
-    private async Task EditPaymentAsync(PagamentoItemViewModel? item)
+    private void EditPayment(PagamentoItemViewModel? item)
     {
         if (item == null) return;
-        if (OnRequestPaymentDialog != null)
+        var vm = new PaymentDialogViewModel(Beneficiarios, item.Model);
+        vm.RequestClose += async () =>
         {
-            var result = await OnRequestPaymentDialog.Invoke(item.Model);
-            if (result)
+            if (vm.IsConfirmed)
             {
-                await LoadInitialDataAsync();
-                ShowNotification($"Parcela {item.ParcelaNumero} atualizada!", "success");
+                try
+                {
+                    var p = vm.ToPagamento();
+                    await _pagamentoRepo.SaveAsync(p);
+                    await LoadInitialDataAsync();
+                    ShowNotification($"Parcela {item.ParcelaNumero} atualizada!", "success");
+                }
+                catch (Exception ex)
+                {
+                    ShowNotification($"Erro ao atualizar parcela: {ex.Message}", "error");
+                }
             }
-        }
+            IsPaymentDialogOpen = false;
+        };
+        PaymentDialogVm = vm;
+        IsPaymentDialogOpen = true;
+    }
+
+    [RelayCommand]
+    private void ClosePaymentDialog()
+    {
+        IsPaymentDialogOpen = false;
     }
 
     [RelayCommand]
