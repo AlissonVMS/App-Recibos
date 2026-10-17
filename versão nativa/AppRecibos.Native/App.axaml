@@ -23,8 +23,16 @@
             <Setter Property="Padding" Value="14,7"/>
             <Setter Property="BorderThickness" Value="0"/>
         </Style>
-        <Style Selector="Button.primary:pointerover">
+        <Style Selector="Button.primary /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#2563EB"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#1D4ED8"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#1E40AF"/>
             <Setter Property="Foreground" Value="White"/>
         </Style>
 
@@ -36,8 +44,16 @@
             <Setter Property="Padding" Value="14,7"/>
             <Setter Property="BorderThickness" Value="0"/>
         </Style>
-        <Style Selector="Button.emerald:pointerover">
+        <Style Selector="Button.emerald /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#059669"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.emerald:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#047857"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.emerald:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#065F46"/>
             <Setter Property="Foreground" Value="White"/>
         </Style>
 
@@ -49,8 +65,16 @@
             <Setter Property="Padding" Value="14,7"/>
             <Setter Property="BorderThickness" Value="0"/>
         </Style>
-        <Style Selector="Button.amber:pointerover">
+        <Style Selector="Button.amber /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#D97706"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.amber:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#B45309"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.amber:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#92400E"/>
             <Setter Property="Foreground" Value="White"/>
         </Style>
 
@@ -62,8 +86,16 @@
             <Setter Property="Padding" Value="14,7"/>
             <Setter Property="BorderThickness" Value="0"/>
         </Style>
-        <Style Selector="Button.danger:pointerover">
+        <Style Selector="Button.danger /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#DC2626"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#B91C1C"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.danger:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#991B1B"/>
             <Setter Property="Foreground" Value="White"/>
         </Style>
 
@@ -76,10 +108,209 @@
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="Padding" Value="12,6"/>
         </Style>
-        <Style Selector="Button.secondary:pointerover">
+        <Style Selector="Button.secondary /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="Foreground" Value="#334155"/>
+        </Style>
+        <Style Selector="Button.secondary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#F1F5F9"/>
             <Setter Property="BorderBrush" Value="#94A3B8"/>
             <Setter Property="Foreground" Value="#0F172A"/>
+        </Style>
+        <Style Selector="Button.secondary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#E2E8F0"/>
+            <Setter Property="BorderBrush" Value="#94A3B8"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
+        </Style>
+
+        <!-- Botões de Ação da Faixa de Seleção Ativa (1:1 ao Tailwind escuro) -->
+        <Style Selector="Button.batchQuitar">
+            <Setter Property="Background" Value="#059669"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        <Style Selector="Button.batchQuitar /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#059669"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.batchQuitar:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#10B981"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.batchQuitar:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#047857"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+
+        <Style Selector="Button.batchReverter">
+            <Setter Property="Background" Value="#451A03"/>
+            <Setter Property="Foreground" Value="#FDE68A"/>
+            <Setter Property="BorderBrush" Value="#78350F"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.batchReverter /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#451A03"/>
+            <Setter Property="BorderBrush" Value="#78350F"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="#FDE68A"/>
+        </Style>
+        <Style Selector="Button.batchReverter:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#78350F"/>
+            <Setter Property="BorderBrush" Value="#F59E0B"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="#FEF3C7"/>
+        </Style>
+        <Style Selector="Button.batchReverter:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#351402"/>
+            <Setter Property="Foreground" Value="#FDE68A"/>
+        </Style>
+
+        <Style Selector="Button.batchEmitir">
+            <Setter Property="Background" Value="#2563EB"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#3B82F6"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        <Style Selector="Button.batchEmitir /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#2563EB"/>
+            <Setter Property="BorderBrush" Value="#3B82F6"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.batchEmitir:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#3B82F6"/>
+            <Setter Property="BorderBrush" Value="#60A5FA"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.batchEmitir:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#1D4ED8"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+
+        <Style Selector="Button.batchDesmarcar">
+            <Setter Property="Background" Value="#1E293B"/>
+            <Setter Property="Foreground" Value="#CBD5E1"/>
+            <Setter Property="BorderBrush" Value="#334155"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+        </Style>
+        <Style Selector="Button.batchDesmarcar /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#1E293B"/>
+            <Setter Property="BorderBrush" Value="#334155"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="#CBD5E1"/>
+        </Style>
+        <Style Selector="Button.batchDesmarcar:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#334155"/>
+            <Setter Property="BorderBrush" Value="#475569"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.batchDesmarcar:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#0F172A"/>
+            <Setter Property="BorderBrush" Value="#334155"/>
+            <Setter Property="Foreground" Value="#94A3B8"/>
+        </Style>
+
+        <!-- Atalhos Rápidos de Filtro (Todos, Pagos, Previstos) -->
+        <Style Selector="Button.filterTodos">
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="Foreground" Value="#334155"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+        </Style>
+        <Style Selector="Button.filterTodos /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="Foreground" Value="#334155"/>
+        </Style>
+        <Style Selector="Button.filterTodos:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#F1F5F9"/>
+            <Setter Property="BorderBrush" Value="#94A3B8"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
+        </Style>
+
+        <Style Selector="Button.filterPagos">
+            <Setter Property="Background" Value="#EFF6FF"/>
+            <Setter Property="Foreground" Value="#1D4ED8"/>
+            <Setter Property="BorderBrush" Value="#BFDBFE"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+        </Style>
+        <Style Selector="Button.filterPagos /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#EFF6FF"/>
+            <Setter Property="BorderBrush" Value="#BFDBFE"/>
+            <Setter Property="Foreground" Value="#1D4ED8"/>
+        </Style>
+        <Style Selector="Button.filterPagos:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#DBEAFE"/>
+            <Setter Property="BorderBrush" Value="#93C5FD"/>
+            <Setter Property="Foreground" Value="#1E40AF"/>
+        </Style>
+
+        <Style Selector="Button.filterPrevistos">
+            <Setter Property="Background" Value="#FFFBEB"/>
+            <Setter Property="Foreground" Value="#B45309"/>
+            <Setter Property="BorderBrush" Value="#FDE68A"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+        </Style>
+        <Style Selector="Button.filterPrevistos /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#FFFBEB"/>
+            <Setter Property="BorderBrush" Value="#FDE68A"/>
+            <Setter Property="Foreground" Value="#B45309"/>
+        </Style>
+        <Style Selector="Button.filterPrevistos:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#FEF3C7"/>
+            <Setter Property="BorderBrush" Value="#FCD34D"/>
+            <Setter Property="Foreground" Value="#92400E"/>
+        </Style>
+
+        <Style Selector="Button.topSyncExcel">
+            <Setter Property="Background" Value="#022C22"/>
+            <Setter Property="Foreground" Value="#6EE7B7"/>
+            <Setter Property="BorderBrush" Value="#059669"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.topSyncExcel /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#022C22"/>
+            <Setter Property="BorderBrush" Value="#059669"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="#6EE7B7"/>
+        </Style>
+        <Style Selector="Button.topSyncExcel:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#064E3B"/>
+            <Setter Property="BorderBrush" Value="#10B981"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="#A7F3D0"/>
+        </Style>
+        <Style Selector="Button.topSyncExcel:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#022C22"/>
+            <Setter Property="BorderBrush" Value="#047857"/>
+            <Setter Property="Foreground" Value="#6EE7B7"/>
         </Style>
 
         <Style Selector="Button.ghost">
@@ -92,13 +323,15 @@
         <Style Selector="Button.ghost /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="#94A3B8"/>
         </Style>
         <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#F1F5F9"/>
-            <Setter Property="TextBlock.Foreground" Value="#0F172A"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
         </Style>
         <Style Selector="Button.ghost:pressed /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#E2E8F0"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
         </Style>
 
         <!-- Abas de Navegação -->
@@ -115,17 +348,17 @@
         <Style Selector="Button.navTab /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="TextBlock.Foreground" Value="#94A3B8"/>
-            <Setter Property="TextBlock.FontWeight" Value="Medium"/>
+            <Setter Property="Foreground" Value="#94A3B8"/>
+            <Setter Property="FontWeight" Value="Medium"/>
         </Style>
         <Style Selector="Button.navTab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#1E293B"/>
-            <Setter Property="TextBlock.Foreground" Value="#E2E8F0"/>
+            <Setter Property="Foreground" Value="#E2E8F0"/>
         </Style>
         <Style Selector="Button.navTab.active /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#1E293B"/>
-            <Setter Property="TextBlock.Foreground" Value="#60A5FA"/>
-            <Setter Property="TextBlock.FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#60A5FA"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
         <!-- Botão Emitir Recibo Azul na Tabela -->
@@ -144,12 +377,17 @@
             <Setter Property="Background" Value="#EFF6FF"/>
             <Setter Property="BorderBrush" Value="#BFDBFE"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="TextBlock.Foreground" Value="#1D4ED8"/>
+            <Setter Property="Foreground" Value="#1D4ED8"/>
         </Style>
         <Style Selector="Button.actionEmitirRecibo:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#DBEAFE"/>
             <Setter Property="BorderBrush" Value="#93C5FD"/>
-            <Setter Property="TextBlock.Foreground" Value="#1E40AF"/>
+            <Setter Property="Foreground" Value="#1E40AF"/>
+        </Style>
+        <Style Selector="Button.actionEmitirRecibo:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#BFDBFE"/>
+            <Setter Property="BorderBrush" Value="#60A5FA"/>
+            <Setter Property="Foreground" Value="#1E3A8A"/>
         </Style>
 
         <!-- Status Toggle Buttons na Tabela -->
@@ -168,12 +406,12 @@
             <Setter Property="Background" Value="#ECFDF5"/>
             <Setter Property="BorderBrush" Value="#A7F3D0"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="TextBlock.Foreground" Value="#047857"/>
+            <Setter Property="Foreground" Value="#047857"/>
         </Style>
         <Style Selector="Button.statusTogglePago:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#FEF3C7"/>
             <Setter Property="BorderBrush" Value="#FDE68A"/>
-            <Setter Property="TextBlock.Foreground" Value="#B45309"/>
+            <Setter Property="Foreground" Value="#B45309"/>
         </Style>
 
         <Style Selector="Button.statusTogglePrevisto">
@@ -191,25 +429,38 @@
             <Setter Property="Background" Value="#FFFBEB"/>
             <Setter Property="BorderBrush" Value="#FDE68A"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="TextBlock.Foreground" Value="#B45309"/>
+            <Setter Property="Foreground" Value="#B45309"/>
         </Style>
         <Style Selector="Button.statusTogglePrevisto:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#ECFDF5"/>
             <Setter Property="BorderBrush" Value="#A7F3D0"/>
-            <Setter Property="TextBlock.Foreground" Value="#047857"/>
+            <Setter Property="Foreground" Value="#047857"/>
         </Style>
 
         <Style Selector="Button.inputCopy">
             <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#334155"/>
             <Setter Property="BorderBrush" Value="#E2E8F0"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="Padding" Value="8,4"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
-        <Style Selector="Button.inputCopy:pointerover">
+        <Style Selector="Button.inputCopy /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#334155"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Button.inputCopy:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#F8FAFC"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
+        </Style>
+        <Style Selector="Button.inputCopy:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#F1F5F9"/>
+            <Setter Property="BorderBrush" Value="#94A3B8"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
         </Style>
 
         <!-- Botões de Ação Rápida da Tabela -->
@@ -223,9 +474,21 @@
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="Bold"/>
         </Style>
-        <Style Selector="Button.actionPreview:pointerover">
+        <Style Selector="Button.actionPreview /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#EFF6FF"/>
+            <Setter Property="Foreground" Value="#1D4ED8"/>
+            <Setter Property="BorderBrush" Value="#BFDBFE"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Button.actionPreview:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#DBEAFE"/>
             <Setter Property="Foreground" Value="#1E40AF"/>
+            <Setter Property="BorderBrush" Value="#93C5FD"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Button.actionPreview:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#BFDBFE"/>
+            <Setter Property="Foreground" Value="#1E3A8A"/>
         </Style>
 
         <Style Selector="Button.actionPdf">
@@ -238,9 +501,17 @@
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
-        <Style Selector="Button.actionPdf:pointerover">
+        <Style Selector="Button.actionPdf /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="Foreground" Value="#475569"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Button.actionPdf:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#F1F5F9"/>
             <Setter Property="Foreground" Value="#1E293B"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
         </Style>
 
         <Style Selector="Button.actionEdit">
@@ -253,9 +524,17 @@
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
-        <Style Selector="Button.actionEdit:pointerover">
+        <Style Selector="Button.actionEdit /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="Foreground" Value="#475569"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Button.actionEdit:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#F1F5F9"/>
             <Setter Property="Foreground" Value="#0F172A"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
         </Style>
 
         <Style Selector="Button.actionDelete">
@@ -268,9 +547,17 @@
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
-        <Style Selector="Button.actionDelete:pointerover">
+        <Style Selector="Button.actionDelete /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#FEF2F2"/>
+            <Setter Property="Foreground" Value="#DC2626"/>
+            <Setter Property="BorderBrush" Value="#FECACA"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Button.actionDelete:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#FEE2E2"/>
             <Setter Property="Foreground" Value="#B91C1C"/>
+            <Setter Property="BorderBrush" Value="#FCA5A5"/>
+            <Setter Property="BorderThickness" Value="1"/>
         </Style>
         <!-- CheckBox Estilo Tailwind React (15x15, cantos 2.5px, borda sutil, azul sólido) -->
         <Style Selector="CheckBox">
@@ -340,13 +627,45 @@
             <Setter Property="MinHeight" Value="34"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
-        <Style Selector="ComboBox:pointerover">
+        <Style Selector="ComboBox /template/ Border#Background">
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+        <Style Selector="ComboBox:pointerover /template/ Border#Background">
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
         </Style>
-        <Style Selector="ComboBox:focus">
+        <Style Selector="ComboBox:focus /template/ Border#Background">
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderBrush" Value="#2563EB"/>
+        </Style>
+
+        <!-- ComboBoxItem Estilo e Hover de Alto Contraste -->
+        <Style Selector="ComboBoxItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+        <Style Selector="ComboBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
+        </Style>
+        <Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#F1F5F9"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
+        </Style>
+        <Style Selector="ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#EFF6FF"/>
+            <Setter Property="Foreground" Value="#2563EB"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="ComboBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#DBEAFE"/>
+            <Setter Property="Foreground" Value="#1D4ED8"/>
         </Style>
 
         <!-- DataGrid Cabeçalhos, Linhas e Células 1:1 ao React -->

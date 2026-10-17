@@ -46,12 +46,11 @@
                     <!-- Ações da TopBar -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                         <Button Command="{Binding SyncExcelCommand}"
-                                Background="#022C22" Foreground="#6EE7B7" FontWeight="SemiBold" FontSize="12"
-                                Padding="12,6" CornerRadius="8" BorderBrush="#059669" BorderThickness="1" Cursor="Hand">
+                                Classes="topSyncExcel">
                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                 <Path Data="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z M14 2v5a1 1 0 0 0 1 1h5 M8 13h2 M14 13h2 M8 17h2 M14 17h2"
                                       Stretch="Uniform"
-                                      Stroke="#6EE7B7" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Width="14" Height="14"/>
+                                      Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Width="14" Height="14"/>
                                 <TextBlock Text="Sincronizar Excel" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -323,20 +322,28 @@
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                                 <Button Command="{Binding ExportCsvCommand}" Classes="secondary" FontSize="12">
                                     <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                        <Path Data="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z M14 2v5a1 1 0 0 0 1 1h5 M8 13h2 M14 13h2 M8 17h2 M14 17h2"
-                                              Stroke="#059669" StrokeThickness="1.5" Stretch="Uniform" Width="13" Height="13" VerticalAlignment="Center"/>
+                                        <Path Data="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z M14 2v4a2 2 0 0 0 2 2h4 M8 13h2 M14 13h2 M8 17h2 M14 17h2"
+                                              Stroke="#059669" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round"
+                                              Stretch="Uniform" Width="13" Height="13" VerticalAlignment="Center"/>
                                         <TextBlock Text="Exportar CSV" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
                                 <Button Command="{Binding BatchEmitirRecibosCommand}" Classes="primary" FontSize="12">
                                     <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                         <Path Data="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z M14 2v4a2 2 0 0 0 2 2h4 M10 9H8 M16 13H8 M16 17H8"
-                                              Stroke="White" StrokeThickness="1.5" Stretch="Uniform" Width="13" Height="13" VerticalAlignment="Center"/>
+                                              Stroke="White" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round"
+                                              Stretch="Uniform" Width="13" Height="13" VerticalAlignment="Center"/>
                                         <TextBlock Text="{Binding EmitirRecibosButtonText}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
-                                <Button Content="+ Novo Pagamento" Command="{Binding OpenNewPaymentCommand}"
-                                        Classes="emerald" FontSize="12"/>
+                                <Button Command="{Binding OpenNewPaymentCommand}" Classes="emerald" FontSize="12" Padding="14,7" Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <Path Data="M5 12h14 M12 5v14"
+                                              Stroke="White" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round"
+                                              Stretch="Uniform" Width="12" Height="12" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Novo Pagamento" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -355,9 +362,12 @@
                                           Stroke="#94A3B8" StrokeThickness="1.75" Stretch="Uniform" Width="14" Height="14" Margin="10,0,4,0"/>
                                 </TextBox.InnerLeftContent>
                                 <TextBox.InnerRightContent>
-                                    <Button Content="✕" Command="{Binding ClearSearchCommand}"
-                                            Background="Transparent" Foreground="#94A3B8" Padding="6" Margin="0,0,4,0"
-                                            IsVisible="{Binding SearchQuery.Length}" Cursor="Hand"/>
+                                    <Button Command="{Binding ClearSearchCommand}"
+                                            Background="Transparent" Padding="6" Margin="0,0,4,0"
+                                            IsVisible="{Binding SearchQuery.Length}" Cursor="Hand">
+                                        <Path Data="M18 6L6 18 M6 6l12 12" Stroke="#94A3B8" StrokeThickness="1.75"
+                                              StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="10" Height="10"/>
+                                    </Button>
                                 </TextBox.InnerRightContent>
                             </TextBox>
 
@@ -381,38 +391,36 @@
 
                                 <!-- Atalhos de Seleção Rápida -->
                                 <Button Command="{Binding SelectAllVisibleCommand}"
-                                        Classes="secondary" Padding="10,5" FontSize="11" Margin="0,2,6,2">
+                                        Classes="filterTodos" Margin="0,2,6,2">
                                     <TextBlock Text="{Binding VisibleCount, StringFormat='Todos ({0})'}"/>
                                 </Button>
                                 <Button Command="{Binding SelectOnlyPaidCommand}"
-                                        Background="#EFF6FF" Foreground="#1D4ED8" BorderBrush="#BFDBFE" BorderThickness="1"
-                                        Padding="10,5" FontSize="11" FontWeight="Bold" CornerRadius="6" Margin="0,2,6,2">
+                                        Classes="filterPagos" Margin="0,2,6,2">
                                     <TextBlock Text="{Binding TotalPaidCount, StringFormat='Pagos ({0})'}"/>
                                 </Button>
                                 <Button Command="{Binding SelectOnlyPrevistoCommand}"
-                                        Background="#FEF3C7" Foreground="#92400E" BorderBrush="#FDE68A" BorderThickness="1"
-                                        Padding="10,5" FontSize="11" FontWeight="Bold" CornerRadius="6" Margin="0,2,0,2">
+                                        Classes="filterPrevistos" Margin="0,2,0,2">
                                     <TextBlock Text="{Binding TotalPrevistoCount, StringFormat='Previstos ({0})'}"/>
                                 </Button>
                             </WrapPanel>
 
-                            <!-- FAIXA FLUTUANTE DE AÇÕES DA SELEÇÃO ATIVA (SURGE COM DESTAQUE) -->
+                            <!-- FAIXA FLUTUANTE DE AÇÕES DA SELEÇÃO ATIVA (SURGE COM DESTAQUE, RESPONSIVA 1:1 AO REACT) -->
                             <Border IsVisible="{Binding HasSelectedPayments}"
                                     Background="#0F172A" CornerRadius="10" Padding="14,10"
                                     BorderThickness="1" BorderBrush="#1E3A8A">
-                                <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <!-- Chips de Resumo -->
-                                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,16,2">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <!-- Chips de Resumo na Esquerda (fluido com quebra se faltar espaço) -->
+                                    <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,12,2">
                                         <TextBlock Text="Seleção Ativa:" Foreground="#94A3B8" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0"/>
 
                                         <!-- Total Selecionadas -->
-                                        <Border Background="#1E3A8A" CornerRadius="6" Padding="8,3" Margin="0,0,6,0">
+                                        <Border Background="#1E3A8A" CornerRadius="6" Padding="8,3" Margin="0,0,6,0" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding SelectedCount, StringFormat='{}{0} selecionada(s)'}"
                                                        Foreground="#93C5FD" FontSize="11" FontWeight="Bold"/>
                                         </Border>
 
                                         <!-- Pagas -->
-                                        <Border Background="#064E3B" CornerRadius="6" Padding="8,3" Margin="0,0,6,0" IsVisible="{Binding HasSelectedPaid}">
+                                        <Border Background="#064E3B" CornerRadius="6" Padding="8,3" Margin="0,0,6,0" IsVisible="{Binding HasSelectedPaid}" VerticalAlignment="Center">
                                             <TextBlock Foreground="#6EE7B7" FontSize="11" FontWeight="Bold">
                                                 <TextBlock.Text>
                                                     <MultiBinding StringFormat="{}{0} paga(s) ({1})">
@@ -424,42 +432,72 @@
                                         </Border>
 
                                         <!-- Previstas -->
-                                        <Border Background="#78350F" CornerRadius="6" Padding="8,3" IsVisible="{Binding HasSelectedPrevisto}">
+                                        <Border Background="#78350F" CornerRadius="6" Padding="8,3" IsVisible="{Binding HasSelectedPrevisto}" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding SelectedPrevistoCount, StringFormat='{}{0} prevista(s)'}"
                                                        Foreground="#FCD34D" FontSize="11" FontWeight="Bold"/>
                                         </Border>
                                     </WrapPanel>
 
-                                    <!-- Botões de Ação em Lote -->
-                                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Button Content="{Binding SelectedPrevistoCount, StringFormat='Quitar / Pagar ({0})'}"
-                                                Command="{Binding BatchQuitarCommand}"
-                                                Classes="emerald" FontSize="11" Padding="10,5" Margin="0,2,6,2"
-                                                IsVisible="{Binding HasSelectedPrevisto}"/>
+                                    <!-- Botões de Ação na Direita (permanecem na linha superior ao redimensionar) -->
+                                    <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                        <Button Command="{Binding BatchQuitarCommand}"
+                                                Classes="batchQuitar" FontSize="11" Padding="12,6" Margin="0,2,6,2"
+                                                IsVisible="{Binding HasSelectedPrevisto}" Cursor="Hand">
+                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <Path Data="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M9 12l2 2 4-4"
+                                                      Stroke="White" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Stretch="Uniform" Width="12" Height="12" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding SelectedPrevistoCount, StringFormat='Quitar / Pagar ({0})'}"
+                                                           FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
 
-                                        <Button Content="{Binding SelectedPaidCount, StringFormat='Reverter ({0})'}"
-                                                Command="{Binding BatchReverterCommand}"
-                                                Classes="amber" FontSize="11" Padding="10,5" Margin="0,2,6,2"
-                                                IsVisible="{Binding HasSelectedPaid}"/>
+                                        <Button Command="{Binding BatchReverterCommand}"
+                                                Classes="batchReverter" FontSize="11" Padding="12,6" Margin="0,2,6,2"
+                                                IsVisible="{Binding HasSelectedPaid}" Cursor="Hand">
+                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <Path Data="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5"
+                                                      Stroke="#FDE68A" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Stretch="Uniform" Width="12" Height="12" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding SelectedPaidCount, StringFormat='Reverter ({0})'}"
+                                                           FontWeight="SemiBold" Foreground="#FDE68A" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
 
-                                        <Button Content="{Binding SelectedPaidCount, StringFormat='Emitir Recibo(s) ({0})'}"
-                                                Command="{Binding BatchEmitirRecibosCommand}"
-                                                Classes="primary" FontSize="11" Padding="10,5" Margin="0,2,6,2"
-                                                IsVisible="{Binding HasSelectedPaid}"/>
+                                        <Button Command="{Binding BatchEmitirRecibosCommand}"
+                                                Classes="batchEmitir" FontSize="11" Padding="14,6" Margin="0,2,6,2"
+                                                IsVisible="{Binding HasSelectedPaid}" Cursor="Hand">
+                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <Path Data="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z M14 2v4a2 2 0 0 0 2 2h4 M10 9H8 M16 13H8 M16 17H8"
+                                                      Stroke="White" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Stretch="Uniform" Width="12" Height="12" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding SelectedPaidCount, StringFormat='Emitir Recibo(s) ({0})'}"
+                                                           FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
 
-                                        <Button Content="Desmarcar" Command="{Binding ClearSelectionCommand}"
-                                                Classes="secondary" FontSize="11" Padding="10,5" Margin="0,2,0,2"/>
+                                        <Button Command="{Binding ClearSelectionCommand}"
+                                                Classes="batchDesmarcar" FontSize="11" Padding="10,6" Margin="0,2,0,2" Cursor="Hand">
+                                            <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                                                <Path Data="M18 6L6 18 M6 6l12 12"
+                                                      Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center"/>
+                                                <TextBlock Text="Desmarcar" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
                                     </WrapPanel>
-                                </WrapPanel>
+                                </Grid>
                             </Border>
 
                             <!-- Aviso Informativo para Previstos -->
                             <Border IsVisible="{Binding HasSelectedPrevisto}"
                                     Background="#EFF6FF" CornerRadius="6" Padding="10,6"
                                     BorderThickness="1" BorderBrush="#BFDBFE">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <TextBlock Text="ℹ️" FontSize="12"/>
-                                    <TextBlock Foreground="#1E40AF" FontSize="11">
+                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <Path Data="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M12 16v-4 M12 8h.01"
+                                          Stroke="#2563EB" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round"
+                                          Stretch="Uniform" Width="13" Height="13" VerticalAlignment="Center"/>
+                                    <TextBlock Foreground="#1E40AF" FontSize="11" VerticalAlignment="Center">
                                         <TextBlock.Text>
                                             <Binding Path="SelectedPrevistoCount" StringFormat="Aviso Informativo: {0} parcelas selecionadas têm status PREVISTO. Recibos são gerados apenas para parcelas quitadas. Clique em 'Quitar / Pagar' acima para liquidá-las."/>
                                         </TextBlock.Text>
@@ -499,7 +537,15 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Beneficiário -->
-                                    <DataGridTemplateColumn Header="BENEFICIÁRIO" Width="*" MinWidth="160">
+                                    <DataGridTemplateColumn Width="*" MinWidth="160">
+                                        <DataGridTemplateColumn.Header>
+                                            <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                                                <TextBlock Text="BENEFICIÁRIO" FontWeight="Bold" FontSize="11" Foreground="#475569" VerticalAlignment="Center"/>
+                                                <Path Data="M21 16l-4 4-4-4 M17 20V4 M3 8l4-4 4 4 M7 4v16"
+                                                      Stroke="#94A3B8" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataGridTemplateColumn.Header>
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate x:DataType="vm:PagamentoItemViewModel">
                                                 <StackPanel Spacing="2" VerticalAlignment="Center" Margin="8,4">
@@ -511,7 +557,15 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Parcela -->
-                                    <DataGridTemplateColumn Header="PARCELA" Width="72">
+                                    <DataGridTemplateColumn Width="76">
+                                        <DataGridTemplateColumn.Header>
+                                            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock Text="PARCELA" FontWeight="Bold" FontSize="11" Foreground="#475569" VerticalAlignment="Center"/>
+                                                <Path Data="M5 12l7-7 7 7 M12 19V5"
+                                                      Stroke="#2563EB" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Stretch="Uniform" Width="11" Height="11" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataGridTemplateColumn.Header>
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate x:DataType="vm:PagamentoItemViewModel">
                                                 <Border Background="#EFF6FF" CornerRadius="6" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -523,7 +577,15 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Status (Pill Interativo Clicável) -->
-                                    <DataGridTemplateColumn Header="STATUS" Width="90">
+                                    <DataGridTemplateColumn Width="94">
+                                        <DataGridTemplateColumn.Header>
+                                            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock Text="STATUS" FontWeight="Bold" FontSize="11" Foreground="#475569" VerticalAlignment="Center"/>
+                                                <Path Data="M21 16l-4 4-4-4 M17 20V4 M3 8l4-4 4 4 M7 4v16"
+                                                      Stroke="#94A3B8" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataGridTemplateColumn.Header>
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate x:DataType="vm:PagamentoItemViewModel">
                                                 <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -531,8 +593,8 @@
                                                             Command="{Binding ToggleStatusCommand}"
                                                             IsVisible="{Binding IsPago}">
                                                         <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                                            <Path Data="M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4L12 14.01l-3-3"
-                                                                  Stroke="#047857" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round"
+                                                            <Path Data="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M9 12l2 2 4-4"
+                                                                  Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round"
                                                                   Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center"/>
                                                             <TextBlock Text="PAGO" VerticalAlignment="Center"/>
                                                         </StackPanel>
@@ -542,8 +604,8 @@
                                                             Command="{Binding ToggleStatusCommand}"
                                                             IsVisible="{Binding IsPrevisto}">
                                                         <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                                            <Path Data="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 6v6l4 2"
-                                                                  Stroke="#B45309" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round"
+                                                            <Path Data="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M12 6v6l4 2"
+                                                                  Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round"
                                                                   Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center"/>
                                                             <TextBlock Text="PREVISTO" VerticalAlignment="Center"/>
                                                         </StackPanel>
@@ -554,7 +616,15 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Previsão -->
-                                    <DataGridTemplateColumn Header="PREVISÃO" Width="92">
+                                    <DataGridTemplateColumn Width="94">
+                                        <DataGridTemplateColumn.Header>
+                                            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock Text="PREVISÃO" FontWeight="Bold" FontSize="11" Foreground="#475569" VerticalAlignment="Center"/>
+                                                <Path Data="M21 16l-4 4-4-4 M17 20V4 M3 8l4-4 4 4 M7 4v16"
+                                                      Stroke="#94A3B8" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataGridTemplateColumn.Header>
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate x:DataType="vm:PagamentoItemViewModel">
                                                 <TextBlock Text="{Binding PrevisaoFormatada}" FontFamily="Consolas, monospace" FontSize="11" Foreground="#334155"
@@ -564,7 +634,15 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Data Pgto -->
-                                    <DataGridTemplateColumn Header="DATA PGTO" Width="95">
+                                    <DataGridTemplateColumn Width="98">
+                                        <DataGridTemplateColumn.Header>
+                                            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock Text="DATA PGTO" FontWeight="Bold" FontSize="11" Foreground="#475569" VerticalAlignment="Center"/>
+                                                <Path Data="M21 16l-4 4-4-4 M17 20V4 M3 8l4-4 4 4 M7 4v16"
+                                                      Stroke="#94A3B8" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataGridTemplateColumn.Header>
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate x:DataType="vm:PagamentoItemViewModel">
                                                 <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -580,7 +658,15 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Valor -->
-                                    <DataGridTemplateColumn Header="VALOR" Width="98">
+                                    <DataGridTemplateColumn Width="102">
+                                        <DataGridTemplateColumn.Header>
+                                            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <TextBlock Text="VALOR" FontWeight="Bold" FontSize="11" Foreground="#475569" VerticalAlignment="Center"/>
+                                                <Path Data="M21 16l-4 4-4-4 M17 20V4 M3 8l4-4 4 4 M7 4v16"
+                                                      Stroke="#94A3B8" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataGridTemplateColumn.Header>
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate x:DataType="vm:PagamentoItemViewModel">
                                                 <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="6" Padding="6,2"
@@ -592,7 +678,15 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Saldo Restante -->
-                                    <DataGridTemplateColumn Header="SALDO RESTANTE" Width="120">
+                                    <DataGridTemplateColumn Width="124">
+                                        <DataGridTemplateColumn.Header>
+                                            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <TextBlock Text="SALDO RESTANTE" FontWeight="Bold" FontSize="11" Foreground="#475569" VerticalAlignment="Center"/>
+                                                <Path Data="M21 16l-4 4-4-4 M17 20V4 M3 8l4-4 4 4 M7 4v16"
+                                                      Stroke="#94A3B8" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataGridTemplateColumn.Header>
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate x:DataType="vm:PagamentoItemViewModel">
                                                 <Border Background="#FFFBEB" BorderBrush="#FDE68A" BorderThickness="1" CornerRadius="6" Padding="6,2"
@@ -604,7 +698,15 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Forma / Pix -->
-                                    <DataGridTemplateColumn Header="FORMA / PIX" Width="125">
+                                    <DataGridTemplateColumn Width="128">
+                                        <DataGridTemplateColumn.Header>
+                                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                <TextBlock Text="FORMA / PIX" FontWeight="Bold" FontSize="11" Foreground="#475569" VerticalAlignment="Center"/>
+                                                <Path Data="M21 16l-4 4-4-4 M17 20V4 M3 8l4-4 4 4 M7 4v16"
+                                                      Stroke="#94A3B8" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataGridTemplateColumn.Header>
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate x:DataType="vm:PagamentoItemViewModel">
                                                 <StackPanel Spacing="1" VerticalAlignment="Center" Margin="6,0">
@@ -617,7 +719,11 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Ações & Recibo -->
-                                    <DataGridTemplateColumn Header="AÇÕES &amp; RECIBO" Width="180">
+                                    <DataGridTemplateColumn Width="180">
+                                        <DataGridTemplateColumn.Header>
+                                            <TextBlock Text="AÇÕES &amp; RECIBO" FontWeight="Bold" FontSize="11" Foreground="#475569"
+                                                       HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        </DataGridTemplateColumn.Header>
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate x:DataType="vm:PagamentoItemViewModel">
                                                 <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
@@ -625,7 +731,7 @@
                                                     <Button Classes="ghost" Padding="4" ToolTip.Tip="Confirmar Pagamento (Marcar como PAGO)"
                                                             Command="{Binding ToggleStatusCommand}"
                                                             IsVisible="{Binding IsPrevisto}" Cursor="Hand">
-                                                        <Path Data="M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4L12 14.01l-3-3"
+                                                        <Path Data="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M9 12l2 2 4-4"
                                                               Stroke="#059669" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round"
                                                               Stretch="Uniform" Width="13" Height="13"/>
                                                     </Button>
@@ -643,7 +749,7 @@
                                                             ToolTip.Tip="Conferir e Emitir Recibo Oficial">
                                                         <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                                                             <Path Data="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z M14 2v4a2 2 0 0 0 2 2h4 M10 9H8 M16 13H8 M16 17H8"
-                                                                  Stroke="#1D4ED8" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                                                                  Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
                                                                   Stretch="Uniform" Width="11" Height="11" VerticalAlignment="Center"/>
                                                             <TextBlock Text="Emitir Recibo" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                                         </StackPanel>
